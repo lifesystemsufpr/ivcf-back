@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                  String     @id @default(uuid())
+  cpf                 String     @unique
+  fullName            String
+  fullName_normalized String     @default("") @db.Text
+  password            String
+  active              Boolean    @default(true)
+  gender              Gender
+  role                SystemRole
+  phone               String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  healthProfessional HealthProfessional?
+  participant        Participant?
+  researcher         Researcher?
+
+  @@index([fullName_normalized])
+  @@map("user")
+}
+
+model Researcher {
+  id            String  @id @unique
+  email         String  @unique
+  institutionId String
+  fieldOfStudy  String?
+  active        Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  user        User        @relation(fields: [id], references: [id])
+  institution Institution @relation(fields: [institutionId], references: [id])
+
+  @@index([institutionId])
+  @@map("researcher")
+}
+
+model Institution {
+  id               String  @id @default(uuid())
+  title            String
+  title_normalized String  @default("") @db.Text
+  active           Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  researchers Researcher[]
+
+  @@index([title_normalized])
+  @@index([active])
+  @@map("institution")
+}
+
+model HealthProfessional {
+  id                    String  @id @unique
+  email                 String  @unique
+  active                Boolean @default(true)
+  speciality            String
+  speciality_normalized String  @default("") @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  appliedQuestionnaires QuestionnaireResponse[]
+  user                  User                    @relation(fields: [id], references: [id])
+
+  @@index([speciality])
+  @@index([speciality_normalized])
+  @@index([active])
+  @@map("health_professional")
+}
+
+model HealthcareUnit {
+  id              String  @id @default(uuid())
+  name            String
+  name_normalized String  @default("") @db.Text
+  zipCode         String
+  street          String
+  number          String
+  complement      String?
+  city            String
+  state           String
+  neighborhood    String
+  active          Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  questionnaireResponses QuestionnaireResponse[]
+
+  @@index([name_normalized])
+  @@index([active])
+  @@map("healthcare_unit")
+}
+
+model Participant {
+  id                   String              @id @unique
+  birthday             DateTime            @db.Date
+  weight               Int                 @default(0)
+  height               Int                 @default(0)
+  zipCode              String
+  street               String
+  number               String
+  complement           String?
+  city                 String
+  state                String
+  neighborhood         String
+  active               Boolean             @default(true)
+  socio_economic_level SocialEconomicLevel
+  scholarship          Scholarship
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  questionnaireResponses QuestionnaireResponse[]
+  user                   User                    @relation(fields: [id], references: [id])
+
+  @@map("participant")
+}
+
+model Questionnaire {
+  id          String  @id @default(uuid())
+  title       String
+  slug        String  @unique
+  description String? @db.Text
+  active      Boolean @default(true)
+  version     String  @default("1.0")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groups    QuestionGroup[]
+  responses QuestionnaireResponse[]
+
+  @@map("questionnaire")
+}
+
+model QuestionGroup {
+  id          String  @id @default(uuid())
+  title       String
+  order       Int
+  description String? @db.Text
+
+  questionnaireId String
+  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+
+  subGroups QuestionSubGroup[]
+  questions Question[]
+
+  @@index([questionnaireId])
+  @@map("question_group")
+}
+
+model QuestionSubGroup {
+  id          String  @id @default(uuid())
+  title       String
+  order       Int
+  description String? @db.Text
+
+  groupId String
+  group   QuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  questions Question[]
+
+  @@index([groupId])
+  @@map("question_subgroup")
+}
+
+model Question {
+  id        String       @id @default(uuid())
+  statement String       @db.Text
+  order     Int
+  type      QuestionType
+  required  Boolean      @default(true)
+
+  groupId String?
+  group   QuestionGroup? @relation(fields: [groupId], references: [id])
+
+  subGroupId String?
+  subGroup   QuestionSubGroup? @relation(fields: [subGroupId], references: [id])
+
+  options QuestionOption[]
+  answers Answer[]
+
+  @@map("question")
+}
+
+model QuestionOption {
+  id    String @id @default(uuid())
+  label String
+  score Int @default(0)
+  order Int
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  answers Answer[]
+
+  @@index([questionId])
+  @@map("question_option")
+}
+
+model QuestionnaireResponse {
+  id String @id @default(uuid())
+
+  totalScore     Int     @default(0)
+  classification String?
+  date           DateTime @default(now())
+
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id])
+
+  healthProfessionalId String
+  healthProfessional   HealthProfessional @relation(fields: [healthProfessionalId], references: [id])
+
+  healthcareUnitId String
+  healthcareUnit   HealthcareUnit @relation(fields: [healthcareUnitId], references: [id])
+
+  questionnaireId String
+  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id])
+
+  answers Answer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([participantId])
+  @@index([healthProfessionalId])
+  @@index([healthcareUnitId])
+  @@map("questionnaire_response")
+}
+
+model Answer {
+  id String @id @default(uuid())
+
+  questionnaireResponseId String
+  questionnaireResponse   QuestionnaireResponse @relation(fields: [questionnaireResponseId], references: [id], onDelete: Cascade)
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+
+  selectedOptionId String?
+  selectedOption   QuestionOption? @relation(fields: [selectedOptionId], references: [id])
+
+  valueText String?
+
+  @@index([questionnaireResponseId])
+  @@map("answer")
+}
+
+enum QuestionType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  MULTIPLE_CHOICE
+  SCALE
+}
+
+enum SystemRole {
+  MANAGER
+  PARTICIPANT
+  RESEARCHER
+  HEALTH_PROFESSIONAL
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Scholarship {
+  NONE
+  FUNDAMENTAL_INCOMPLETE
+  FUNDAMENTAL_COMPLETE
+  HIGH_SCHOOL_INCOMPLETE
+  HIGH_SCHOOL_COMPLETE
+  HIGHER_EDUCATION_INCOMPLETE
+  HIGHER_EDUCATION_COMPLETE
+  POSTGRADUATE
+  MASTERS
+  DOCTORATE
+}
+
+enum SocialEconomicLevel {
+  A
+  B
+  C
+  D
+  E
+}
