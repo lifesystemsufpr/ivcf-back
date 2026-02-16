@@ -62,7 +62,7 @@ jobs:
         with:
           switches: -avz --delete
           path: deploy/
-          remote_path: /var/www/cobe-api-v2
+          remote_path: /var/www/TecnoAging-api
           remote_host: ${{ secrets.SSH_HOST }}
           remote_user: ${{ secrets.SSH_USER }}
           remote_key: ${{ secrets.SSH_KEY }}
@@ -80,7 +80,7 @@ jobs:
           script: |
             set -e
 
-            cd /var/www/cobe-api-v2
+            cd /var/www/TecnoAging-api
             
             # ------------------------------
             # Criar .env a partir do secret
