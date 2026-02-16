@@ -62,7 +62,7 @@ jobs:
         with:
           switches: -avz --delete
           path: deploy/
-          remote_path: /var/www/TecnoAging-api
+          remote_path: /var/www/ivcf-api
           remote_host: ${{ secrets.SSH_HOST }}
           remote_user: ${{ secrets.SSH_USER }}
           remote_key: ${{ secrets.SSH_KEY }}
@@ -80,7 +80,7 @@ jobs:
           script: |
             set -e
 
-            cd /var/www/TecnoAging-api
+            cd /var/www/ivcf-api
             
             # ------------------------------
             # Criar .env a partir do secret
@@ -109,12 +109,12 @@ jobs:
             # ------------------------------
             npx prisma generate
 
-            cd /var/www/ivcf-back
+            cd /var/www/ivcf-api
 
             # ------------------------------
             # PM2
             # ------------------------------
-            pm2 start ecosystem.config.js --env production || pm2 restart TecnoAging-api
+            pm2 start ecosystem.config.js --env production || pm2 restart ivcf-api
             pm2 save
 
             echo "✅ Deploy concluído com sucesso"
