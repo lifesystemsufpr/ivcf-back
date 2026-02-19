@@ -1,0 +1,120 @@
+name: Deploy Cobe V2 API
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  deploy:
+    name: Build and Deploy to Server
+    runs-on: ubuntu-latest
+
+    steps:
+      # ----------------------------------------
+      # Checkout
+      # ----------------------------------------
+      - name: Checkout código
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # ----------------------------------------
+      # Node + pnpm (CI)
+      # ----------------------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      # ----------------------------------------
+      # Build (sem prune)
+      # ----------------------------------------
+      - name: Instalar dependências (CI)
+        run: npm install
+
+      - name: Build da aplicação
+        run: npm run build
+
+      # Prisma aqui é opcional, mas OK deixar
+      - name: Prisma generate (CI)
+        run: npx prisma generate
+
+      # ----------------------------------------
+      # Preparar artefatos (WORKSPACE INTEIRO)
+      # ----------------------------------------
+      - name: Preparar arquivos para deploy
+        run: |
+          mkdir deploy
+          cp -r \
+            dist \
+            package.json \
+            package-lock.json \
+            prisma \            
+            ecosystem.config.js \
+            deploy/
+
+      # ----------------------------------------
+      # Deploy via rsync (SSH nativo)
+      # ----------------------------------------
+      - name: Enviar arquivos para o servidor
+        uses: burnett01/rsync-deployments@v8
+        with:
+          switches: -avz --delete
+          path: deploy/
+          remote_path: /var/www/ivcf-api
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_user: ${{ secrets.SSH_USER }}
+          remote_key: ${{ secrets.SSH_KEY }}
+
+      # ----------------------------------------
+      # Pós-deploy no servidor
+      # ----------------------------------------
+      - name: Pós deploy (install + prisma + pm2)
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            cd /var/www/ivcf-api
+            
+            # ------------------------------
+            # Criar .env a partir do secret
+            # ------------------------------
+              echo "Criando .env no servidor..."
+            
+            echo "${{ secrets.ENV_DEV }}" | base64 -d > .env
+            chmod 600 .env
+            
+            echo ".env criado com sucesso"
+
+            # ------------------------------
+            # Node / npm
+            # ------------------------------
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            nvm use default
+
+            # ------------------------------
+            # Install workspace completo
+            # ------------------------------
+            npm install
+
+            # ------------------------------
+            # Prisma
+            # ------------------------------
+            npx prisma generate
+
+            cd /var/www/ivcf-api
+
+            # ------------------------------
+            # PM2
+            # ------------------------------
+            pm2 start ecosystem.config.js --env production || pm2 restart ivcf-api
+            pm2 save
+
+            echo "✅ Deploy concluído com sucesso"
