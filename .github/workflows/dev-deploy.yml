@@ -33,12 +33,12 @@ jobs:
       - name: Instalar dependências (CI)
         run: npm install
 
-      - name: Build da aplicação
-        run: npm run build
-
       # Prisma aqui é opcional, mas OK deixar
       - name: Prisma generate (CI)
         run: npx prisma generate
+
+      - name: Build da aplicação
+        run: npm run build
 
       # ----------------------------------------
       # Preparar artefatos (WORKSPACE INTEIRO)
