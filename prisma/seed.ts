@@ -582,7 +582,7 @@ async function main() {
       const randomUnit = units[Math.floor(Math.random() * units.length)];
       let totalScore = 0;
 
-      const answersData: any[] = [];
+      const answersData: AnswerInput[] = [];
       const scoresByGroup: Record<string, { score: number; order: number }> =
         {};
 
@@ -591,7 +591,7 @@ async function main() {
 
         const isHealthy = Math.random() > 0.4;
         const selectedOption = isHealthy
-          ? question.options.find((o: any) => o.score === 0) ||
+          ? question.options.find((o) => o.score === 0) ||
             question.options[0]
           : question.options[
               Math.floor(Math.random() * question.options.length)

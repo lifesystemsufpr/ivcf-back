@@ -100,7 +100,7 @@ export class AuthService {
       role: user.role,
     };
 
-    const refreshPayload: Record<string, any> = {
+    const refreshPayload: Record<string, string | boolean> = {
       sub: user.id,
       persistent: keepMeLoggedIn,
     };
