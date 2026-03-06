@@ -30,4 +30,5 @@ export interface SwaggerConfig {
   version: string;
   path: string;
   enabled: boolean;
+  useGlobalPrefix: boolean;
 }

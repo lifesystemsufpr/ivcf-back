@@ -49,6 +49,7 @@ export default () => {
       enabled: process.env.SWAGGER_ENABLED
         ? Boolean(process.env.SWAGGER_ENABLED)
         : true,
+      useGlobalPrefix: true,
     },
     cors: {
       enabled: process.env.CORS_ENABLED
