@@ -21,6 +21,7 @@ export const setupSwagger = (
   const customOptions: SwaggerCustomOptions = {
     yamlDocumentUrl: swaggerConfig.path + "/export",
     raw: ["yaml"],
+    useGlobalPrefix: swaggerConfig.useGlobalPrefix,
   };
 
   SwaggerModule.setup(swaggerConfig.path, app, document, customOptions);
