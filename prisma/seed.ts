@@ -440,20 +440,9 @@ async function main() {
 
   console.log("👑 Criando Usuários Fixos...");
 
-  await prisma.user.create({
-    data: {
-      cpf: "00000000000",
-      fullName: "Admin do Sistema",
-      fullName_normalized: "admin do sistema",
-      gender: Gender.OTHER,
-      password: passwordHash,
-      role: SystemRole.MANAGER,
-    },
-  });
-
   const fixedDoctor = await prisma.user.create({
     data: {
-      cpf: "11111111111",
+      email: "medico@sistema.com",
       fullName: "Dra. Ana Fixa",
       fullName_normalized: "dra. ana fixa",
       gender: Gender.FEMALE,
@@ -461,7 +450,7 @@ async function main() {
       role: SystemRole.HEALTH_PROFESSIONAL,
       healthProfessional: {
         create: {
-          email: "ana.fixa@teste.com",
+          // O email foi removido daqui pois pertence apenas ao 'User'
           speciality: "Geriatria",
           speciality_normalized: "geriatria",
         },
@@ -515,9 +504,11 @@ async function main() {
   console.log("👨‍⚕️ Criando Profissionais Aleatórios...");
   for (let i = 0; i < 5; i++) {
     const name = faker.person.fullName();
+    const hpEmail = `medico${i}@teste.com`;
+
     const hpUser = await prisma.user.create({
       data: {
-        cpf: faker.string.numeric(11),
+        email: hpEmail,
         fullName: name,
         fullName_normalized: normalizeString(name) || name.toLowerCase(),
         gender: i % 2 === 0 ? Gender.MALE : Gender.FEMALE,
@@ -525,7 +516,7 @@ async function main() {
         role: SystemRole.HEALTH_PROFESSIONAL,
         healthProfessional: {
           create: {
-            email: faker.internet.email(),
+            // O email foi removido daqui pois pertence apenas ao 'User'
             speciality: "Fisioterapia",
             speciality_normalized: "fisioterapia",
           },
@@ -544,10 +535,11 @@ async function main() {
   for (let i = 0; i < 20; i++) {
     const sex = i % 2 === 0 ? "male" : "female";
     const name = faker.person.fullName({ sex });
+    const participantEmail = `paciente${i}@teste.com`;
 
     const participantUser = await prisma.user.create({
       data: {
-        cpf: faker.string.numeric(11),
+        email: participantEmail,
         fullName: name,
         fullName_normalized: normalizeString(name) || name.toLowerCase(),
         gender: sex === "male" ? Gender.MALE : Gender.FEMALE,
@@ -582,7 +574,8 @@ async function main() {
       const randomUnit = units[Math.floor(Math.random() * units.length)];
       let totalScore = 0;
 
-      const answersData: AnswerInput[] = [];
+      const answersData: { questionId: string; selectedOptionId: string }[] =
+        [];
       const scoresByGroup: Record<string, { score: number; order: number }> =
         {};
 
@@ -591,7 +584,7 @@ async function main() {
 
         const isHealthy = Math.random() > 0.4;
         const selectedOption = isHealthy
-          ? question.options.find((o) => o.score === 0) ||
+          ? question.options.find((o: any) => o.score === 0) ||
             question.options[0]
           : question.options[
               Math.floor(Math.random() * question.options.length)
@@ -645,9 +638,11 @@ async function main() {
 
   console.log("✅ Seed concluído com sucesso!");
   console.log("------------------------------------------------");
-  console.log("🔑 CREDENCIAIS:");
-  console.log("   ADMIN:   CPF 00000000000 / senha123");
-  console.log("   MÉDICO:  CPF 11111111111 / senha123");
+  console.log("🔑 CREDENCIAIS DE TESTE:");
+  console.log("   MÉDICO:  medico@sistema.com / senha123");
+  console.log(
+    "   (Demais profissionais e pacientes seguem o padrão medicoX@teste.com, pacienteX@teste.com)",
+  );
   console.log("------------------------------------------------");
 }
 

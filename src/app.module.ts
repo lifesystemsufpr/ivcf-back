@@ -28,7 +28,6 @@ import { PrismaClientExceptionFilter } from "./shared/prisma/filters/prisma-clie
     SharedModule,
     AuthModule,
     UserModule,
-    ManagerModule,
     ResearcherModule,
     HealthProfessionalModule,
     ParticipantModule,
