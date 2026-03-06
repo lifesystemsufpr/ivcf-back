@@ -49,13 +49,11 @@ async function bootstrap() {
 
   if (swaggerConfig.enabled) {
     logger.log("Swagger enabled");
-    const swaggerFullPath = "/backend/" + swaggerConfig.path;
+
+    const swaggerPath = swaggerConfig.path;
+
     app.use(
-      [
-        swaggerFullPath,
-        swaggerFullPath + "-json",
-        swaggerFullPath + "/export",
-      ],
+      [`/${swaggerPath}`, `/${swaggerPath}-json`],
       basicAuth({
         challenge: true,
         users: {
@@ -64,6 +62,7 @@ async function bootstrap() {
         },
       }),
     );
+
     setupSwagger(app, swaggerConfig);
   }
 
