@@ -8,7 +8,6 @@ datasource db {
 
 model User {
   id                  String     @id @default(uuid())
-  cpf                 String     @unique
   fullName            String
   fullName_normalized String     @default("") @db.Text
   password            String
@@ -198,7 +197,7 @@ model Question {
 model QuestionOption {
   id    String @id @default(uuid())
   label String
-  score Int @default(0)
+  score Int    @default(0)
   order Int
 
   questionId String
@@ -213,7 +212,7 @@ model QuestionOption {
 model QuestionnaireResponse {
   id String @id @default(uuid())
 
-  totalScore     Int     @default(0)
+  totalScore     Int      @default(0)
   classification String?
   date           DateTime @default(now())
 
