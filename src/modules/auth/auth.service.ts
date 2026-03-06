@@ -23,18 +23,18 @@ export class AuthService {
   ) {}
 
   async validateCredentials(
-    cpf: string,
+    email: string,
     password: string,
   ): Promise<Partial<User> | null> {
     try {
       const dbUrl = process.env.DATABASE_URL || "NÃO DEFINIDA";
 
-      const user = await this.prisma.user.findFirst({
-        where: { cpf },
+      const user = await this.prisma.user.findUnique({
+        where: { email },
         select: {
           id: true,
           fullName: true,
-          cpf: true,
+          email: true,
           role: true,
           password: true,
           active: true,
@@ -44,7 +44,7 @@ export class AuthService {
       if (!user) {
         throw new UnauthorizedException({
           debug_error: "USUÁRIO_NAO_ENCONTRADO",
-          message: `O CPF ${cpf} não retornou nenhum registro.`,
+          message: `O e-mail ${email} não retornou nenhum registro.`,
           server_env: process.env.NODE_ENV,
           db_check: dbUrl.split("@")[1] || "Url mal formatada ou local",
         });
@@ -95,7 +95,7 @@ export class AuthService {
 
     const payload: Record<string, any> = {
       username: user.fullName,
-      cpf: user.cpf,
+      email: user.email,
       sub: user.id,
       role: user.role,
     };
@@ -159,7 +159,7 @@ export class AuthService {
       select: {
         id: true,
         fullName: true,
-        cpf: true,
+        email: true,
         role: true,
       },
     });

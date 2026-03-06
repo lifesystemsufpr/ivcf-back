@@ -12,23 +12,20 @@ import {
 
 export class CreateUserDto {
   @ApiProperty({
-    description:
-      "User's CPF, must contain exactly 11 digits without punctuation.",
-    example: "12345678901",
-  })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(11)
-  @MaxLength(11)
-  cpf: string;
-
-  @ApiProperty({
     description: "User's full name.",
     example: "Maria da Silva",
   })
   @IsString()
   @IsNotEmpty()
   fullName: string;
+
+  @ApiProperty({
+    description: "User's email address (must be unique).",
+    example: "maria.silva@example.com",
+  })
+  @IsString()
+  @IsNotEmpty()
+  email: string;
 
   @ApiProperty({
     description: "User's phone number (optional).",
