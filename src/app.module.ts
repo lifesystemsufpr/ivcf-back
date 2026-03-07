@@ -5,7 +5,6 @@ import { SharedModule } from "./shared/shared.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UserService } from "./modules/users/user.service";
 import { UserModule } from "./modules/users/user.module";
-import { ManagerModule } from "./modules/manager/manager.module";
 import { ResearcherModule } from "./modules/researcher/researcher.module";
 import { HealthProfessionalModule } from "./modules/health-professional/health-professional.module";
 import { HealthUnitModule } from "./modules/health-unit/health-unit.module";
@@ -29,7 +28,6 @@ import { PrismaClientExceptionFilter } from "./shared/prisma/filters/prisma-clie
     SharedModule,
     AuthModule,
     UserModule,
-    ManagerModule,
     ResearcherModule,
     HealthProfessionalModule,
     ParticipantModule,

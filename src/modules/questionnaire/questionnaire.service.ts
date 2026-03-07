@@ -122,9 +122,9 @@ export class QuestionnaireService {
       page = 1,
       pageSize = 10,
       search,
-      participantCpf,
+      participantEmail,
       participantName,
-      healthProfessionalCpf,
+      healthProfessionalEmail,
       healthProfessionalName,
       questionnaireSlug,
       startDate,
@@ -136,11 +136,11 @@ export class QuestionnaireService {
 
     const conditions: Prisma.QuestionnaireResponseWhereInput[] = [];
 
-    if (participantCpf) {
+    if (participantEmail) {
       conditions.push({
         participant: {
           user: {
-            cpf: { contains: participantCpf, mode: "insensitive" },
+            email: { contains: participantEmail, mode: "insensitive" },
           },
         },
       });
@@ -156,11 +156,11 @@ export class QuestionnaireService {
       });
     }
 
-    if (healthProfessionalCpf) {
+    if (healthProfessionalEmail) {
       conditions.push({
         healthProfessional: {
           user: {
-            cpf: { contains: healthProfessionalCpf, mode: "insensitive" },
+            email: { contains: healthProfessionalEmail, mode: "insensitive" },
           },
         },
       });
@@ -213,7 +213,7 @@ export class QuestionnaireService {
                       mode: "insensitive",
                     },
                   },
-                  { cpf: { contains: search } },
+                  { email: { contains: search } },
                 ],
               },
             },
@@ -264,7 +264,7 @@ export class QuestionnaireService {
               user: {
                 select: {
                   fullName: true,
-                  cpf: true,
+                  email: true,
                 },
               },
             },
@@ -297,7 +297,7 @@ export class QuestionnaireService {
       questionnaireSlug: r.questionnaire.slug,
       participantId: r.participant.id,
       participantName: r.participant.user.fullName,
-      participantCpf: r.participant.user.cpf,
+      participantEmail: r.participant.user.email,
       healthProfessionalId: r.healthProfessional.id,
       healthProfessionalName: r.healthProfessional.user.fullName,
       healthProfessionalSpeciality: r.healthProfessional.speciality,

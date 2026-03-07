@@ -25,7 +25,7 @@ export class ParticipantService extends BaseService<
     protected readonly prisma: PrismaService,
     private readonly userService: UserService,
   ) {
-    super(prisma, prisma.participant, ["user.fullName", "user.cpf"], {
+    super(prisma, prisma.participant, ["user.fullName", "user.email"], {
       user: true,
     });
   }

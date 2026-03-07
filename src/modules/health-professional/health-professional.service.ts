@@ -31,7 +31,7 @@ export class HealthProfessionalService extends BaseService<
     super(
       prisma,
       prisma.healthProfessional,
-      ["user.fullName", "user.cpf", "speciality"],
+      ["user.fullName", "user.email", "speciality"],
       {
         user: true,
       },

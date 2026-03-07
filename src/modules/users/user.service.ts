@@ -42,9 +42,7 @@ export class UserService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
-        throw new ConflictException(
-          "O e-mail ou CPF fornecido já está em uso.",
-        );
+        throw new ConflictException("O e-mail fornecido já está em uso.");
       }
       throw new InternalServerErrorException(
         "Não foi possível criar o usuário.",
@@ -62,9 +60,9 @@ export class UserService {
     });
   }
 
-  findByCpf(cpf: string) {
+  findByEmail(email: string) {
     return this.prisma.user.findUnique({
-      where: { cpf },
+      where: { email },
     });
   }
 
