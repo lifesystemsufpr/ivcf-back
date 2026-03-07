@@ -19,12 +19,4 @@ export class CreateHealthProfessionalDto {
   @IsNotEmpty()
   @IsString()
   speciality: string;
-
-  @ApiProperty({
-    description: "The email of the health professional",
-    example: "joao.silva@example.com",
-  })
-  @IsNotEmpty()
-  @IsString()
-  email: string;
 }
