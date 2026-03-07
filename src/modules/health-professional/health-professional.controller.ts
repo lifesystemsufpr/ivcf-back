@@ -15,6 +15,7 @@ import { ApiBearerAuth, ApiNoContentResponse } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { SystemRole } from "@prisma/client";
 import { QueryDto } from "src/shared/dto/query.dto";
+import { Public } from "../auth/decorators/public.decorator";
 
 @Controller("health-professional")
 @ApiBearerAuth()
@@ -24,7 +25,7 @@ export class HealthProfessionalController {
   ) {}
 
   @Post()
-  @Roles([SystemRole.MANAGER])
+  @Public()
   create(@Body() createHealthProfessionalDto: CreateHealthProfessionalDto) {
     return this.healthProfessionalService.create(createHealthProfessionalDto);
   }
