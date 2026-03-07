@@ -1,4 +1,4 @@
-name: Deploy Cobe V2 API
+name: Deploy IVCF API
 
 on:
   push:
