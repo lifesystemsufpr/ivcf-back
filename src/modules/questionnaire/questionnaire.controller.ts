@@ -27,6 +27,11 @@ export class QuestionnaireController {
     return this.service.findAllByParticipant(id);
   }
 
+  @Get("participant/:participantId/evolution")
+  getParticipantEvolution(@Param("participantId") id: string) {
+    return this.service.getParticipantEvolution(id);
+  }
+
   @Get("response/:id")
   getOneResponse(@Param("id") id: string) {
     return this.service.findOneResponse(id);
