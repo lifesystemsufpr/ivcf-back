@@ -352,15 +352,40 @@ export class QuestionnaireService {
     });
   }
 
-  async getParticipantEvolution(
-    participantId: string,
-  ): Promise<ParticipantEvolutionResponse> {
-    const participant = await this.prisma.participant.findUniqueOrThrow({
-      where: { id: participantId },
-      include: { user: { select: { fullName: true } } },
-    });
+  private static readonly GROUP_TO_DOMAIN: Record<
+    number,
+    keyof IvcfDomainScores
+  > = {
+    1: "age",
+    2: "selfPerception",
+    3: "functionalCapacity",
+    4: "functionalCapacity",
+    5: "cognition",
+    6: "mood",
+    7: "mobility",
+    8: "communication",
+    9: "comorbidities",
+  };
 
-    const responses = await this.prisma.questionnaireResponse.findMany({
+  private static readonly GROUP_CAPS: Record<number, number> = {
+    3: 4,
+    6: 2,
+    9: 4,
+  };
+
+  private static readonly DOMAIN_DEFAULTS: IvcfDomainScores = {
+    age: 0,
+    selfPerception: 0,
+    functionalCapacity: 0,
+    cognition: 0,
+    mood: 0,
+    mobility: 0,
+    communication: 0,
+    comorbidities: 0,
+  };
+
+  private getIvcfResponsesQuery(participantId: string) {
+    return this.prisma.questionnaireResponse.findMany({
       where: {
         participantId,
         questionnaire: { slug: "ivcf-20" },
@@ -385,37 +410,11 @@ export class QuestionnaireService {
         },
       },
     });
+  }
 
-    const GROUP_TO_DOMAIN: Record<number, keyof IvcfDomainScores> = {
-      1: "age",
-      2: "selfPerception",
-      3: "functionalCapacity",
-      4: "functionalCapacity",
-      5: "cognition",
-      6: "mood",
-      7: "mobility",
-      8: "communication",
-      9: "comorbidities",
-    };
-
-    const GROUP_CAPS: Record<number, number> = {
-      3: 4,
-      6: 2,
-      9: 4,
-    };
-
-    const domainDefaults: IvcfDomainScores = {
-      age: 0,
-      selfPerception: 0,
-      functionalCapacity: 0,
-      cognition: 0,
-      mood: 0,
-      mobility: 0,
-      communication: 0,
-      comorbidities: 0,
-    };
-
-    const assessments = responses.map((response) => {
+  private computeAssessment(
+    response: Awaited<ReturnType<typeof this.getIvcfResponsesQuery>>[number],
+  ): IvcfAssessment {
       const scoresByGroupOrder: Record<number, number> = {};
       const rawResponses: Record<string, string> = {};
 
@@ -438,8 +437,10 @@ export class QuestionnaireService {
         }
       }
 
-      for (const [groupOrderStr, cap] of Object.entries(GROUP_CAPS)) {
-        const order = Number(groupOrderStr);
+    for (const [orderStr, cap] of Object.entries(
+      QuestionnaireService.GROUP_CAPS,
+    )) {
+      const order = Number(orderStr);
         if (scoresByGroupOrder[order] !== undefined) {
           scoresByGroupOrder[order] = Math.min(
             scoresByGroupOrder[order],
@@ -448,12 +449,13 @@ export class QuestionnaireService {
         }
       }
 
-      const domains = { ...domainDefaults };
+    const domains: IvcfDomainScores = {
+      ...QuestionnaireService.DOMAIN_DEFAULTS,
+    };
 
-      for (const [groupOrderStr, score] of Object.entries(
-        scoresByGroupOrder,
-      )) {
-        const domainKey = GROUP_TO_DOMAIN[Number(groupOrderStr)];
+    for (const [orderStr, score] of Object.entries(scoresByGroupOrder)) {
+      const domainKey =
+        QuestionnaireService.GROUP_TO_DOMAIN[Number(orderStr)];
         if (domainKey) {
           domains[domainKey] += score;
         }
@@ -461,22 +463,22 @@ export class QuestionnaireService {
       
       // o total do banco estava vindo como 0, provavelmente por conta das seeds
       // então recalculei em memória. depois conversar com Lucca sobre 
-      const calculatedTotal = Object.values(domains).reduce(
+      const totalScore = Object.values(domains).reduce(
         (sum, val) => sum + val,
         0,
       );
 
       let riskLevel = "Robusto";
-      if (calculatedTotal >= 7 && calculatedTotal <= 14) {
+    if (totalScore >= 7 && totalScore <= 14) {
         riskLevel = "Em Risco de Fragilização";
-      } else if (calculatedTotal >= 15) {
+    } else if (totalScore >= 15) {
         riskLevel = "Frágil";
       }
 
       return {
         id: response.id,
         date: response.date.toISOString(),
-        totalScore: calculatedTotal,
+      totalScore,
         riskLevel,
         domains,
         rawResponses,
