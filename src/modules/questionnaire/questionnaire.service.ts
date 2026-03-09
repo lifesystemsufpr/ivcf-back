@@ -6,7 +6,12 @@ import { Prisma } from "@prisma/client";
 import { normalizeString } from "src/shared/functions/normalize-string";
 import type {
   IvcfDomainScores,
+  IvcfAssessment,
   ParticipantEvolutionResponse,
+  ParticipantSummaryResponse,
+  ScoreHistoryResponse,
+  DomainHistoryResponse,
+  AssessmentDetailResponse,
 } from "./interfaces/ivcf-evolution.interface";
 
 @Injectable()
@@ -415,39 +420,38 @@ export class QuestionnaireService {
   private computeAssessment(
     response: Awaited<ReturnType<typeof this.getIvcfResponsesQuery>>[number],
   ): IvcfAssessment {
-      const scoresByGroupOrder: Record<number, number> = {};
-      const rawResponses: Record<string, string> = {};
+    const scoresByGroupOrder: Record<number, number> = {};
+    const rawResponses: Record<string, string> = {};
 
-      for (const answer of response.answers) {
-        const groupOrder =
-          answer.question.group?.order ??
-          answer.question.subGroup?.group?.order;
-        
+    for (const answer of response.answers) {
+      const groupOrder =
+        answer.question.group?.order ??
+        answer.question.subGroup?.group?.order;
 
-        if (groupOrder !== undefined && answer.selectedOption) {
-          scoresByGroupOrder[groupOrder] =
-            (scoresByGroupOrder[groupOrder] || 0) +
-            answer.selectedOption.score;
-        }
-        if (answer.selectedOption) {
-          rawResponses[answer.question.statement] =
-            answer.selectedOption.label;
-        } else if (answer.valueText) {
-          rawResponses[answer.question.statement] = answer.valueText;
-        }
+      if (groupOrder !== undefined && answer.selectedOption) {
+        scoresByGroupOrder[groupOrder] =
+          (scoresByGroupOrder[groupOrder] || 0) +
+          answer.selectedOption.score;
       }
+      if (answer.selectedOption) {
+        rawResponses[answer.question.statement] =
+          answer.selectedOption.label;
+      } else if (answer.valueText) {
+        rawResponses[answer.question.statement] = answer.valueText;
+      }
+    }
 
     for (const [orderStr, cap] of Object.entries(
       QuestionnaireService.GROUP_CAPS,
     )) {
       const order = Number(orderStr);
-        if (scoresByGroupOrder[order] !== undefined) {
-          scoresByGroupOrder[order] = Math.min(
-            scoresByGroupOrder[order],
-            cap,
-          );
-        }
+      if (scoresByGroupOrder[order] !== undefined) {
+        scoresByGroupOrder[order] = Math.min(
+          scoresByGroupOrder[order],
+          cap,
+        );
       }
+    }
 
     const domains: IvcfDomainScores = {
       ...QuestionnaireService.DOMAIN_DEFAULTS,
@@ -456,34 +460,34 @@ export class QuestionnaireService {
     for (const [orderStr, score] of Object.entries(scoresByGroupOrder)) {
       const domainKey =
         QuestionnaireService.GROUP_TO_DOMAIN[Number(orderStr)];
-        if (domainKey) {
-          domains[domainKey] += score;
-        }
+      if (domainKey) {
+        domains[domainKey] += score;
       }
-      
+    }
+
       // o total do banco estava vindo como 0, provavelmente por conta das seeds
       // então recalculei em memória. depois conversar com Lucca sobre 
       const totalScore = Object.values(domains).reduce(
-        (sum, val) => sum + val,
-        0,
-      );
+      (sum, val) => sum + val,
+      0,
+    );
 
-      let riskLevel = "Robusto";
+    let riskLevel = "Robusto";
     if (totalScore >= 7 && totalScore <= 14) {
-        riskLevel = "Em Risco de Fragilização";
+      riskLevel = "Em Risco de Fragilização";
     } else if (totalScore >= 15) {
-        riskLevel = "Frágil";
-      }
-
-      return {
-        id: response.id,
-        date: response.date.toISOString(),
-      totalScore,
-        riskLevel,
-        domains,
-        rawResponses,
-      };
+      riskLevel = "Frágil";
     }
+
+    return {
+      id: response.id,
+      date: response.date.toISOString(),
+      totalScore,
+      riskLevel,
+      domains,
+      rawResponses,
+    };
+  }
 
   private async getParticipantWithName(participantId: string) {
     return this.prisma.participant.findUniqueOrThrow({
@@ -509,20 +513,112 @@ export class QuestionnaireService {
     };
   }
 
-  async getParticipantEvolution(
+  async getParticipantSummary(
     participantId: string,
-  ): Promise<ParticipantEvolutionResponse> {
+  ): Promise<ParticipantSummaryResponse> {
     const [participant, responses] = await Promise.all([
       this.getParticipantWithName(participantId),
       this.getIvcfResponsesQuery(participantId),
     ]);
 
     const assessments = responses.map((r) => this.computeAssessment(r));
+    const last = assessments.length > 0 ? assessments[assessments.length - 1] : null;
 
     return {
       participantId,
       participantName: participant.user.fullName,
-      assessments,
+      totalAssessments: assessments.length,
+      lastAssessment: last
+        ? {
+            id: last.id,
+            date: last.date,
+            totalScore: last.totalScore,
+            riskLevel: last.riskLevel,
+            domains: last.domains,
+          }
+        : null,
     };
+  }
+
+  async getScoreHistory(
+    participantId: string,
+  ): Promise<ScoreHistoryResponse> {
+    const [participant, responses] = await Promise.all([
+      this.getParticipantWithName(participantId),
+      this.getIvcfResponsesQuery(participantId),
+    ]);
+
+    const scores = responses.map((r) => {
+      const assessment = this.computeAssessment(r);
+      return {
+        id: assessment.id,
+        date: assessment.date,
+        totalScore: assessment.totalScore,
+        riskLevel: assessment.riskLevel,
+      };
+    });
+
+    return {
+      participantId,
+      participantName: participant.user.fullName,
+      scores,
+    };
+  }
+
+  async getDomainHistory(
+    participantId: string,
+  ): Promise<DomainHistoryResponse> {
+    const [participant, responses] = await Promise.all([
+      this.getParticipantWithName(participantId),
+      this.getIvcfResponsesQuery(participantId),
+    ]);
+
+    const history = responses.map((r) => {
+      const assessment = this.computeAssessment(r);
+      return {
+        id: assessment.id,
+        date: assessment.date,
+        domains: assessment.domains,
+      };
+    });
+
+    return {
+      participantId,
+      participantName: participant.user.fullName,
+      history,
+    };
+  }
+
+  async getAssessmentDetail(
+    participantId: string,
+    assessmentId: string,
+  ): Promise<AssessmentDetailResponse> {
+    const response = await this.prisma.questionnaireResponse.findUniqueOrThrow({
+      where: {
+        id: assessmentId,
+        participantId,
+        questionnaire: { slug: "ivcf-20" },
+      },
+      include: {
+        answers: {
+          include: {
+            selectedOption: { select: { score: true, label: true } },
+            question: {
+              select: {
+                statement: true,
+                group: { select: { order: true } },
+                subGroup: {
+                  select: {
+                    group: { select: { order: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return this.computeAssessment(response);
   }
 }
