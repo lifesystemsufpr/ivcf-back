@@ -483,7 +483,41 @@ export class QuestionnaireService {
         domains,
         rawResponses,
       };
+    }
+
+  private async getParticipantWithName(participantId: string) {
+    return this.prisma.participant.findUniqueOrThrow({
+      where: { id: participantId },
+      include: { user: { select: { fullName: true } } },
     });
+  }
+
+  async getParticipantEvolution(
+    participantId: string,
+  ): Promise<ParticipantEvolutionResponse> {
+    const [participant, responses] = await Promise.all([
+      this.getParticipantWithName(participantId),
+      this.getIvcfResponsesQuery(participantId),
+    ]);
+
+    const assessments = responses.map((r) => this.computeAssessment(r));
+
+    return {
+      participantId,
+      participantName: participant.user.fullName,
+      assessments,
+    };
+  }
+
+  async getParticipantEvolution(
+    participantId: string,
+  ): Promise<ParticipantEvolutionResponse> {
+    const [participant, responses] = await Promise.all([
+      this.getParticipantWithName(participantId),
+      this.getIvcfResponsesQuery(participantId),
+    ]);
+
+    const assessments = responses.map((r) => this.computeAssessment(r));
 
     return {
       participantId,
