@@ -113,7 +113,6 @@ export class QuestionnaireService {
         healthProfessionalId: dto.healthProfessionalId,
         questionnaireId: dto.questionnaireId,
         totalScore: finalScore,
-        healthcareUnitId: dto.healthcareUnitId,
         classification: classification,
         answers: {
           create: dto.answers.map((ans) => ({
@@ -425,17 +424,14 @@ export class QuestionnaireService {
 
     for (const answer of response.answers) {
       const groupOrder =
-        answer.question.group?.order ??
-        answer.question.subGroup?.group?.order;
+        answer.question.group?.order ?? answer.question.subGroup?.group?.order;
 
       if (groupOrder !== undefined && answer.selectedOption) {
         scoresByGroupOrder[groupOrder] =
-          (scoresByGroupOrder[groupOrder] || 0) +
-          answer.selectedOption.score;
+          (scoresByGroupOrder[groupOrder] || 0) + answer.selectedOption.score;
       }
       if (answer.selectedOption) {
-        rawResponses[answer.question.statement] =
-          answer.selectedOption.label;
+        rawResponses[answer.question.statement] = answer.selectedOption.label;
       } else if (answer.valueText) {
         rawResponses[answer.question.statement] = answer.valueText;
       }
@@ -446,10 +442,7 @@ export class QuestionnaireService {
     )) {
       const order = Number(orderStr);
       if (scoresByGroupOrder[order] !== undefined) {
-        scoresByGroupOrder[order] = Math.min(
-          scoresByGroupOrder[order],
-          cap,
-        );
+        scoresByGroupOrder[order] = Math.min(scoresByGroupOrder[order], cap);
       }
     }
 
@@ -458,16 +451,15 @@ export class QuestionnaireService {
     };
 
     for (const [orderStr, score] of Object.entries(scoresByGroupOrder)) {
-      const domainKey =
-        QuestionnaireService.GROUP_TO_DOMAIN[Number(orderStr)];
+      const domainKey = QuestionnaireService.GROUP_TO_DOMAIN[Number(orderStr)];
       if (domainKey) {
         domains[domainKey] += score;
       }
     }
 
-      // o total do banco estava vindo como 0, provavelmente por conta das seeds
-      // então recalculei em memória. depois conversar com Lucca sobre 
-      const totalScore = Object.values(domains).reduce(
+    // o total do banco estava vindo como 0, provavelmente por conta das seeds
+    // então recalculei em memória. depois conversar com Lucca sobre
+    const totalScore = Object.values(domains).reduce(
       (sum, val) => sum + val,
       0,
     );
@@ -522,7 +514,8 @@ export class QuestionnaireService {
     ]);
 
     const assessments = responses.map((r) => this.computeAssessment(r));
-    const last = assessments.length > 0 ? assessments[assessments.length - 1] : null;
+    const last =
+      assessments.length > 0 ? assessments[assessments.length - 1] : null;
 
     return {
       participantId,
@@ -540,9 +533,7 @@ export class QuestionnaireService {
     };
   }
 
-  async getScoreHistory(
-    participantId: string,
-  ): Promise<ScoreHistoryResponse> {
+  async getScoreHistory(participantId: string): Promise<ScoreHistoryResponse> {
     const [participant, responses] = await Promise.all([
       this.getParticipantWithName(participantId),
       this.getIvcfResponsesQuery(participantId),
