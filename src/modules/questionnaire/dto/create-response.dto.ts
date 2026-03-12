@@ -35,10 +35,6 @@ export class CreateResponseDto {
   @IsNotEmpty()
   questionnaireId: string;
 
-  @IsString()
-  @IsNotEmpty()
-  healthcareUnitId: string;
-
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => AnswerDto)

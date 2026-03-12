@@ -81,15 +81,15 @@ jobs:
             set -e
 
             cd /var/www/ivcf-api
-            
+
             # ------------------------------
             # Criar .env a partir do secret
             # ------------------------------
               echo "Criando .env no servidor..."
-            
+
             echo "${{ secrets.ENV_DEV }}" | base64 -d > .env
             chmod 600 .env
-            
+
             echo ".env criado com sucesso"
 
             # ------------------------------
@@ -108,6 +108,7 @@ jobs:
             # Prisma
             # ------------------------------
             npx prisma generate
+            npx prisma migrate deploy
 
             cd /var/www/ivcf-api
 

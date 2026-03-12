@@ -94,8 +94,6 @@ model HealthcareUnit {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  questionnaireResponses QuestionnaireResponse[]
-
   @@index([name_normalized])
   @@index([active])
   @@map("healthcare_unit")
@@ -221,9 +219,6 @@ model QuestionnaireResponse {
   healthProfessionalId String
   healthProfessional   HealthProfessional @relation(fields: [healthProfessionalId], references: [id])
 
-  healthcareUnitId String
-  healthcareUnit   HealthcareUnit @relation(fields: [healthcareUnitId], references: [id])
-
   questionnaireId String
   questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id])
 
@@ -234,7 +229,6 @@ model QuestionnaireResponse {
 
   @@index([participantId])
   @@index([healthProfessionalId])
-  @@index([healthcareUnitId])
   @@map("questionnaire_response")
 }
 
