@@ -565,13 +565,12 @@ async function main() {
     });
 
     if (!participantUser.participant) continue;
-    const participantId = participantUser.participant.id;
-    const randomHPId =
+    const participantId: string = participantUser.participant.id;
+    const randomHPId: string =
       healthProsIds[Math.floor(Math.random() * healthProsIds.length)];
 
     if (Math.random() > 0.2 && ivcfFull) {
-      const responseDate = faker.date.recent({ days: 90 });
-      const randomUnit = units[Math.floor(Math.random() * units.length)];
+      const responseDate: Date = faker.date.recent({ days: 90 });
       let totalScore = 0;
 
       const answersData: { questionId: string; selectedOptionId: string }[] =
@@ -584,7 +583,7 @@ async function main() {
 
         const isHealthy = Math.random() > 0.4;
         const selectedOption = isHealthy
-          ? question.options.find((o: any) => o.score === 0) ||
+          ? question.options.find((o: { score: number }) => o.score === 0) ||
             question.options[0]
           : question.options[
               Math.floor(Math.random() * question.options.length)
@@ -623,7 +622,6 @@ async function main() {
         data: {
           participantId: participantId,
           healthProfessionalId: randomHPId,
-          healthcareUnitId: randomUnit.id,
           questionnaireId: ivcfFull.id,
           date: responseDate,
           totalScore: totalScore,
