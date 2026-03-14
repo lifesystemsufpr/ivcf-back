@@ -6,6 +6,8 @@ import {
   Res,
   Req,
   UnauthorizedException,
+  HttpCode,
+  HttpStatus,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { LocalAuthGuard } from "./guards/local-auth.guard";
@@ -16,6 +18,7 @@ import { LoginDto } from "./dto/login.dto";
 import { Response, Request } from "express";
 import { ConfigService } from "@nestjs/config";
 import { ApiBody } from "@nestjs/swagger";
+import { ForgotPasswordDto, ResetPasswordDto } from "./dto/forgot-password.dto";
 
 @Controller("auth")
 export class AuthController {
@@ -100,5 +103,27 @@ export class AuthController {
       res.clearCookie("refresh_token");
       throw new UnauthorizedException("Refresh token inválido ou expirado");
     }
+  }
+
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(forgotPasswordDto.email);
+    return {
+      message:
+        "Se o e-mail estiver cadastrado, um link de recuperação será enviado.",
+    };
+  }
+
+  @Post("reset-password")
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    await this.authService.resetPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.newPassword,
+    );
+    return {
+      message: "Senha redefinida com sucesso.",
+    };
   }
 }

@@ -3,12 +3,16 @@ import {
   Injectable,
   Logger,
   UnauthorizedException,
+  BadRequestException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { AccessToken, JwtPayload, Payload } from "./interfaces/auth.interface";
 import { User } from "@prisma/client";
 import { PrismaService } from "src/shared/prisma/prisma.service";
-import { comparePassword } from "src/shared/functions/hash-password";
+import {
+  comparePassword,
+  hashPassword,
+} from "src/shared/functions/hash-password";
 import { ConfigService } from "@nestjs/config";
 import { SecurityConfig } from "src/shared/config/config.interface";
 
@@ -168,5 +172,77 @@ export class AuthService {
       return null;
     }
     return user;
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return;
+    }
+
+    const securityConfig =
+      this.configService.getOrThrow<SecurityConfig>("security");
+
+    const payload = { sub: user.id, email: user.email };
+    const resetToken = await this.jwtService.signAsync(payload, {
+      secret: securityConfig.jwtSecret + user.password,
+      expiresIn: "15m",
+    });
+
+    const frontendUrl =
+      this.configService.get<string>("FRONTEND_URL") || "http://localhost:3000";
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&email=${user.email}`;
+
+    this.logger.log(`Link de recuperação gerado para ${email}: ${resetLink}`);
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const isTokenValidFormat = (
+      tokenPayload: unknown,
+    ): tokenPayload is { sub: string } => {
+      return (
+        typeof tokenPayload === "object" &&
+        tokenPayload !== null &&
+        "sub" in tokenPayload &&
+        typeof (tokenPayload as Record<string, unknown>).sub === "string"
+      );
+    };
+
+    const decodedToken: unknown = this.jwtService.decode(token);
+
+    if (!isTokenValidFormat(decodedToken)) {
+      throw new BadRequestException("Token mal formatado.");
+    }
+
+    const { sub } = decodedToken;
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: sub },
+    });
+
+    if (!user) {
+      throw new BadRequestException("Usuário não encontrado.");
+    }
+
+    const securityConfig =
+      this.configService.getOrThrow<SecurityConfig>("security");
+
+    try {
+      await this.jwtService.verifyAsync(token, {
+        secret: securityConfig.jwtSecret + user.password,
+      });
+    } catch {
+      throw new BadRequestException("Token inválido ou expirado.");
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
   }
 }
