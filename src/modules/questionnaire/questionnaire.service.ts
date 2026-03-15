@@ -388,12 +388,26 @@ export class QuestionnaireService {
     comorbidities: 0,
   };
 
-  private getIvcfResponsesQuery(participantId: string) {
+  private async getIvcfResponsesQuery(participantId: string) {
+    const responseIds = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT DISTINCT ON (DATE(qr."date"))
+        qr."id"
+      FROM "questionnaire_response" AS qr
+      INNER JOIN "questionnaire" AS q
+        ON q."id" = qr."questionnaireId"
+      WHERE qr."participantId" = ${participantId}
+        AND q."slug" = 'ivcf-20'
+      ORDER BY DATE(qr."date") ASC, qr."createdAt" DESC
+    `;
+
+    const ids = responseIds.map((row) => row.id);
+
+    if (ids.length === 0) {
+      return [];
+    }
+
     return this.prisma.questionnaireResponse.findMany({
-      where: {
-        participantId,
-        questionnaire: { slug: "ivcf-20" },
-      },
+      where: { id: { in: ids } },
       orderBy: { date: "asc" },
       include: {
         answers: {
