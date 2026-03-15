@@ -2,6 +2,11 @@ import { Controller, Get, Post, Body, Param, Query } from "@nestjs/common";
 import { QuestionnaireService } from "./questionnaire.service";
 import { CreateResponseDto } from "./dto/create-response.dto";
 import { FilterQuestionnaireResponseDto } from "./dto/filter-questionnaire-response.dto";
+import { FragilityDashboardQueryDto } from "./dto/fragility-dashboard.dto";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { SystemRole } from "@prisma/client";
+import { RequestUser } from "../auth/decorators/request-user.decorator";
+import { Payload } from "../auth/interfaces/auth.interface";
 
 @Controller("questionnaires")
 export class QuestionnaireController {
@@ -17,6 +22,7 @@ export class QuestionnaireController {
     return this.service.findAll(query);
   }
 
+  // TODO: Adicionar roles e registrar healthProfessional basedo no token
   @Post("response")
   create(@Body() dto: CreateResponseDto) {
     return this.service.createResponse(dto);
@@ -58,5 +64,20 @@ export class QuestionnaireController {
   @Get("response/:id")
   getOneResponse(@Param("id") id: string) {
     return this.service.findOneResponse(id);
+  }
+
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
+  @Get("dashboard")
+  getFragilityDashboard(
+    @RequestUser() user: Payload,
+    @Query() query: FragilityDashboardQueryDto,
+  ) {
+    return this.service.getFragilityDashboard(user.id, query);
+  }
+
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
+  @Get("dashboard/current-month")
+  getCurrentMonthStats(@RequestUser() user: Payload) {
+    return this.service.getCurrentMonthStats(user.id);
   }
 }
