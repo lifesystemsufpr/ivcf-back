@@ -7,6 +7,10 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { SystemRole } from "@prisma/client";
 import { RequestUser } from "../auth/decorators/request-user.decorator";
 import { Payload } from "../auth/interfaces/auth.interface";
+import type {
+  FragilityDashboardResponse,
+  CurrentMonthStatsResponse,
+} from "./interfaces/ivcf-evolution.interface";
 
 @Controller("questionnaires")
 export class QuestionnaireController {
@@ -71,13 +75,13 @@ export class QuestionnaireController {
   getFragilityDashboard(
     @RequestUser() user: Payload,
     @Query() query: FragilityDashboardQueryDto,
-  ) {
+  ): Promise<FragilityDashboardResponse> {
     return this.service.getFragilityDashboard(user.id, query);
   }
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Get("dashboard/current-month")
-  getCurrentMonthStats(@RequestUser() user: Payload) {
+  getCurrentMonthStats(@RequestUser() user: Payload): Promise<CurrentMonthStatsResponse> {
     return this.service.getCurrentMonthStats(user.id);
   }
 }

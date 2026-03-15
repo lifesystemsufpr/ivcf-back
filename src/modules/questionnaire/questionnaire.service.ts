@@ -8,6 +8,8 @@ import { FragilityDashboardQueryDto } from "./dto/fragility-dashboard.dto";
 import type {
   IvcfDomainScores,
   IvcfAssessment,
+  FragilityDashboardResponse,
+  CurrentMonthStatsResponse,
   ParticipantEvolutionResponse,
   ParticipantSummaryResponse,
   ScoreHistoryResponse,
@@ -446,7 +448,7 @@ export class QuestionnaireService {
   async getFragilityDashboard(
     healthProfessionalId: string,
     query: FragilityDashboardQueryDto,
-  ) {
+  ): Promise<FragilityDashboardResponse> {
     const responseIds = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT DISTINCT ON (qr."participantId")
         qr."id"
@@ -1019,7 +1021,9 @@ export class QuestionnaireService {
       });
   }
 
-  async getCurrentMonthStats(healthProfessionalId: string) {
+  async getCurrentMonthStats(
+    healthProfessionalId: string,
+  ): Promise<CurrentMonthStatsResponse> {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
