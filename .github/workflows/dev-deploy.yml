@@ -52,6 +52,7 @@ jobs:
             package-lock.json \
             prisma \
             ecosystem.config.js \
+            prisma.config.ts \
             deploy/
 
       # ----------------------------------------
