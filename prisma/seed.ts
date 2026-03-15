@@ -409,10 +409,15 @@ async function main() {
     include: {
       groups: {
         include: {
-          questions: { include: { options: true } },
+          questions: { include: { options: true, group: true } },
           subGroups: {
             include: {
-              questions: { include: { options: true } },
+              questions: {
+                include: {
+                  options: true,
+                  subGroup: { include: { group: true } },
+                },
+              },
             },
           },
         },
