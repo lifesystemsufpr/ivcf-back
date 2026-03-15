@@ -614,7 +614,7 @@ async function main() {
 
       let classification = "Robusto";
       if (totalScore >= 7 && totalScore <= 14) {
-        classification = "Em Risco de Fragilização";
+        classification = "Pré-frágil";
       } else if (totalScore >= 15) {
         classification = "Frágil";
       }
