@@ -61,6 +61,18 @@ export class PrismaService
     );
 
     for (const relation of listRelations) {
+      const relationModel = Prisma.dmmf.datamodel.models.find(
+        (m) => m.name === relation.type,
+      );
+
+      const hasForeignKeyField = relationModel?.fields.some(
+        (field) => field.kind === "scalar" && field.name === modelKey,
+      );
+
+      if (!hasForeignKeyField) {
+        continue;
+      }
+
       // No Prisma Client, os delegates costumam seguir o nome do MODELO em camelCase,
       // não necessariamente o nome do campo no modelo pai.
       const delegateName = `${relation.type.charAt(0).toLowerCase()}${relation.type.slice(1)}`;
