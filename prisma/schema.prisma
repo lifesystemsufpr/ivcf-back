@@ -70,6 +70,7 @@ model HealthProfessional {
   updatedAt DateTime @default(now()) @updatedAt
 
   appliedQuestionnaires QuestionnaireResponse[]
+  participants          Participant[]
   user                  User                    @relation(fields: [id], references: [id])
 
   @@index([speciality])
@@ -114,13 +115,16 @@ model Participant {
   active               Boolean             @default(true)
   socio_economic_level SocialEconomicLevel
   scholarship          Scholarship
+  healthProfessionalId String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
   questionnaireResponses QuestionnaireResponse[]
-  user                   User                    @relation(fields: [id], references: [id])
+  healthProfessional     HealthProfessional @relation(fields: [healthProfessionalId], references: [id])
+  user                   User               @relation(fields: [id], references: [id])
 
+  @@index([healthProfessionalId])
   @@map("participant")
 }
 
