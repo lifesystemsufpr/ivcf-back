@@ -623,7 +623,6 @@ async function main() {
         data: {
           participantId: participantId,
           healthProfessionalId: randomHPId,
-          healthcareUnitId: randomUnit.id,
           questionnaireId: ivcfFull.id,
           date: responseDate,
           totalScore: totalScore,
