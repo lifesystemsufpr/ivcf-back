@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -11,6 +12,7 @@ import { Participant, Prisma, SystemRole, User } from "@prisma/client";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { BaseService } from "src/shared/services/base.service";
 import { QueryDto } from "src/shared/dto/query.dto";
+import { Payload } from "src/modules/auth/interfaces/auth.interface";
 
 type ParticipantWithUser = Participant & { user: User };
 export type ParticipantResponse = Omit<ParticipantWithUser, "user"> &
@@ -39,7 +41,10 @@ export class ParticipantService extends BaseService<
     };
   }
 
-  async create(createParticipantDto: CreateParticipantDto) {
+  async create(
+    createParticipantDto: CreateParticipantDto,
+    healthProfessionalId: string,
+  ) {
     return await this.prisma.$transaction(async (tx) => {
       const {
         user: userData,
@@ -63,21 +68,19 @@ export class ParticipantService extends BaseService<
         data: {
           ...participantData,
           birthday,
-          user: {
-            connect: {
-              id: user.id,
-            },
-          },
+          healthProfessionalId,
+          id: user.id,
         },
       });
 
       return { ...user, ...participant };
     });
   }
-  async findAll(queryDto: QueryDto) {
+  async findAll(queryDto: QueryDto, healthProfessionalId: string) {
     const customWhere = {
       active: true,
       user: { active: true },
+      healthProfessionalId,
     };
 
     console.time("findAll-prisma-query");
@@ -112,26 +115,45 @@ export class ParticipantService extends BaseService<
 
   async findOne(
     id: string,
-    tx?: Prisma.TransactionClient,
+    options?: {
+      tx?: Prisma.TransactionClient;
+      requestUser?: Payload;
+    },
   ): Promise<ParticipantResponse> {
-    const prismaClient = tx || this.prisma;
-    const participantWithUser = await prismaClient.participant.findFirstOrThrow(
-      {
-        where: {
-          id,
-          active: true,
-          user: { active: true },
-        },
+    const prismaClient = options?.tx || this.prisma;
+    const requestUser = options?.requestUser;
+    const where: Prisma.ParticipantWhereInput = {
+      id,
+      active: true,
+      user: { active: true },
+    };
+
+    if (requestUser?.role === SystemRole.HEALTH_PROFESSIONAL) {
+      where.healthProfessionalId = requestUser.id;
+    }
+
+    if (requestUser?.role === SystemRole.PARTICIPANT && requestUser.id !== id) {
+      throw new ForbiddenException(
+        "Acesso não autorizado para este participante.",
+      );
+    }
+
+    const participantWithUser =
+      await prismaClient.participant.findFirstOrThrow({
+        where,
         include: { user: true },
-      },
-    );
+      });
 
     return this.transform(participantWithUser);
   }
 
-  async update(id: string, updateParticipantDto: UpdateParticipantDto) {
+  async update(
+    id: string,
+    updateParticipantDto: UpdateParticipantDto,
+    requestUser: Payload,
+  ) {
     try {
-      await this.findOne(id);
+      await this.findOne(id, { requestUser });
       let hasEffectiveChanges = false;
       const timeZone = "America/Sao_Paulo";
 
@@ -177,7 +199,7 @@ export class ParticipantService extends BaseService<
           );
         }
 
-        return this.findOne(id, tx);
+        return this.findOne(id, { tx, requestUser });
       });
     } catch (error) {
       if (
@@ -198,7 +220,8 @@ export class ParticipantService extends BaseService<
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, requestUser: Payload) {
+    await this.findOne(id, { requestUser });
     const relationInfo = await this.checkDeletability(id);
 
     try {
