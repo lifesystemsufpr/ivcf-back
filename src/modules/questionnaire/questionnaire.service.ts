@@ -102,7 +102,7 @@ export class QuestionnaireService {
 
     let classification = "Robusto";
     if (finalScore >= 7 && finalScore <= 14) {
-      classification = "Em Risco de Fragilização";
+      classification = "Pré-Fragil";
     } else if (finalScore >= 15) {
       classification = "Frágil";
     }
@@ -466,7 +466,7 @@ export class QuestionnaireService {
 
     let riskLevel = "Robusto";
     if (totalScore >= 7 && totalScore <= 14) {
-      riskLevel = "Em Risco de Fragilização";
+      riskLevel = "Pré-Fragil";
     } else if (totalScore >= 15) {
       riskLevel = "Frágil";
     }
