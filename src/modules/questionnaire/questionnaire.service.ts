@@ -16,7 +16,19 @@ import type {
 
 @Injectable()
 export class QuestionnaireService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
+
+  private static readonly DOMAIN_LABELS: Record<keyof IvcfDomainScores, string> =
+    {
+      age: "Idade",
+      selfPerception: "Autopercepção da Saúde",
+      functionalCapacity: "Capacidade Funcional",
+      cognition: "Cognição",
+      mood: "Humor",
+      mobility: "Mobilidade",
+      communication: "Comunicação",
+      comorbidities: "Comorbidades",
+    };
 
   async getIvcfStructure() {
     return await this.prisma.questionnaire.findUnique({
