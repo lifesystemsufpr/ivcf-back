@@ -3,18 +3,17 @@ import {
   InternalServerErrorException,
   Logger,
 } from "@nestjs/common";
-import { PrismaService } from "src/shared/prisma/prisma.service";
-import { Gender, Prisma } from "@prisma/client";
+import { DashboardRepository } from "./dashboard.repository";
 import {
-  AgeDistributionResponse,
-  AgeVsFragilityResponse,
-  AverageAgeResponse,
+  TotalParticipantsResponse,
   AverageScoreResponse,
-  DomainHeatmapResponse,
-  DomainPerformanceResponse,
+  AverageAgeResponse,
+  AgeDistributionResponse,
   RiskDistributionResponse,
   RiskPyramidResponse,
-  TotalParticipantsResponse,
+  AgeVsFragilityResponse,
+  DomainPerformanceResponse,
+  DomainHeatmapResponse,
 } from "./interfaces/dashboard.interface";
 import { DashboardFilterDto } from "./dto/dashboard-filter.dto";
 
@@ -22,66 +21,15 @@ import { DashboardFilterDto } from "./dto/dashboard-filter.dto";
 export class DashboardService {
   private readonly logger = new Logger(DashboardService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
-
-  private calculateAge(birthday: Date): number {
-    const ageDifMs = Date.now() - birthday.getTime();
-    const ageDate = new Date(ageDifMs);
-    return Math.abs(ageDate.getUTCFullYear() - 1970);
-  }
+  constructor(private readonly dashboardRepository: DashboardRepository) {}
 
   async getTotalParticipants(
     filters: DashboardFilterDto,
   ): Promise<TotalParticipantsResponse> {
     try {
-      const { gender, minAge, maxAge, riskClassification } = filters;
-
-      const whereClause: Prisma.ParticipantWhereInput = {
-        active: true,
-      };
-
-      if (gender) {
-        whereClause.user = {
-          gender: gender,
-        };
-      }
-
-      if (minAge !== undefined || maxAge !== undefined) {
-        const today = new Date();
-        const birthdayFilter: Prisma.DateTimeFilter = {};
-
-        if (minAge !== undefined) {
-          birthdayFilter.lte = new Date(
-            today.getFullYear() - minAge,
-            today.getMonth(),
-            today.getDate(),
-          );
-        }
-
-        if (maxAge !== undefined) {
-          birthdayFilter.gte = new Date(
-            today.getFullYear() - maxAge - 1,
-            today.getMonth(),
-            today.getDate() + 1,
-          );
-        }
-
-        whereClause.birthday = birthdayFilter;
-      }
-
-      if (riskClassification) {
-        whereClause.questionnaireResponses = {
-          some: {
-            classification: riskClassification,
-          },
-        };
-      }
-
-      const total = await this.prisma.participant.count({
-        where: whereClause,
-      });
-
-      return { totalParticipantes: total };
+      const result =
+        await this.dashboardRepository.getTotalParticipants(filters);
+      return { totalParticipantes: Number(result[0]?.total || 0) };
     } catch (error) {
       this.logger.error("Error calculating filtered total participants", error);
       throw new InternalServerErrorException(
@@ -90,16 +38,16 @@ export class DashboardService {
     }
   }
 
-  async getAverageScore(): Promise<AverageScoreResponse> {
+  async getAverageScore(
+    filters: DashboardFilterDto,
+  ): Promise<AverageScoreResponse> {
     try {
-      const result = await this.prisma.questionnaireResponse.aggregate({
-        _avg: { totalScore: true },
-        _count: { id: true },
-      });
-
+      const result = await this.dashboardRepository.getAverageScore(filters);
       return {
-        averageScore: Number(result._avg.totalScore?.toFixed(2)) || 0,
-        totalAssessments: result._count.id || 0,
+        averageScore: result[0]?.averageScore
+          ? Number(Number(result[0].averageScore).toFixed(2))
+          : 0,
+        totalAssessments: Number(result[0]?.totalAssessments || 0),
       };
     } catch (error) {
       this.logger.error("Error calculating average score", error);
@@ -107,22 +55,15 @@ export class DashboardService {
     }
   }
 
-  async getAverageAge(): Promise<AverageAgeResponse> {
+  async getAverageAge(
+    filters: DashboardFilterDto,
+  ): Promise<AverageAgeResponse> {
     try {
-      const participants = await this.prisma.participant.findMany({
-        select: { birthday: true },
-        where: { active: true },
-      });
-
-      if (!participants.length) return { averageAge: 0 };
-
-      const totalAge = participants.reduce(
-        (sum, p) => sum + this.calculateAge(p.birthday),
-        0,
-      );
-
+      const result = await this.dashboardRepository.getAverageAge(filters);
       return {
-        averageAge: Math.round(totalAge / participants.length),
+        averageAge: result[0]?.averageAge
+          ? Math.round(Number(result[0].averageAge))
+          : 0,
       };
     } catch (error) {
       this.logger.error("Error calculating average age", error);
@@ -130,31 +71,29 @@ export class DashboardService {
     }
   }
 
-  async getAgeDistribution(): Promise<AgeDistributionResponse[]> {
+  async getAgeDistribution(
+    filters: DashboardFilterDto,
+  ): Promise<AgeDistributionResponse[]> {
     try {
-      const participants = await this.prisma.participant.findMany({
-        select: { birthday: true },
-        where: { active: true },
-      });
+      const result = await this.dashboardRepository.getAgeDistribution(filters);
 
-      const distribution = {
+      const defaultDistribution = {
         "60-69": 0,
         "70-79": 0,
         "80+": 0,
-        Others: 0,
       };
 
-      participants.forEach((p) => {
-        const age = this.calculateAge(p.birthday);
-        if (age >= 60 && age <= 69) distribution["60-69"]++;
-        else if (age >= 70 && age <= 79) distribution["70-79"]++;
-        else if (age >= 80) distribution["80+"]++;
-        else distribution["Others"]++;
+      result.forEach((row) => {
+        if (row.range !== "Others") {
+          defaultDistribution[row.range as keyof typeof defaultDistribution] =
+            Number(row.total);
+        }
       });
 
-      return Object.entries(distribution)
-        .filter(([range]) => range !== "Others")
-        .map(([range, total]) => ({ range, total }));
+      return Object.entries(defaultDistribution).map(([range, total]) => ({
+        range,
+        total,
+      }));
     } catch (error) {
       this.logger.error("Error calculating age distribution", error);
       throw new InternalServerErrorException(
@@ -163,19 +102,16 @@ export class DashboardService {
     }
   }
 
-  async getRiskDistribution(): Promise<RiskDistributionResponse[]> {
+  async getRiskDistribution(
+    filters: DashboardFilterDto,
+  ): Promise<RiskDistributionResponse[]> {
     try {
-      const distribution = await this.prisma.questionnaireResponse.groupBy({
-        by: ["classification"],
-        _count: { id: true },
-      });
-
-      return distribution
-        .filter((d) => d.classification !== null)
-        .map((d) => ({
-          risk: d.classification as string,
-          total: d._count.id,
-        }));
+      const result =
+        await this.dashboardRepository.getRiskDistribution(filters);
+      return result.map((d) => ({
+        risk: d.risk,
+        total: Number(d.total),
+      }));
     } catch (error) {
       this.logger.error("Error calculating risk distribution", error);
       throw new InternalServerErrorException(
@@ -184,54 +120,31 @@ export class DashboardService {
     }
   }
 
-  async getRiskPyramid(): Promise<RiskPyramidResponse[]> {
+  async getRiskPyramid(
+    filters: DashboardFilterDto,
+  ): Promise<RiskPyramidResponse[]> {
     try {
-      const responses = await this.prisma.questionnaireResponse.findMany({
-        where: { classification: { not: null } },
-        select: {
-          classification: true,
-          participant: {
-            select: { user: { select: { gender: true } } },
-          },
-        },
-      });
-
-      const pyramidMap = new Map<string, RiskPyramidResponse>();
-
-      responses.forEach((res) => {
-        const risk = res.classification as string;
-        const gender = res.participant.user.gender;
-
-        if (!pyramidMap.has(risk)) {
-          pyramidMap.set(risk, { risk, male: 0, female: 0, others: 0 });
-        }
-
-        const data = pyramidMap.get(risk)!;
-
-        if (gender === Gender.MALE) data.male++;
-        else if (gender === Gender.FEMALE) data.female++;
-        else data.others++;
-      });
-
-      return Array.from(pyramidMap.values());
+      const result = await this.dashboardRepository.getRiskPyramid(filters);
+      return result.map((row) => ({
+        risk: row.risk,
+        male: Number(row.male),
+        female: Number(row.female),
+        others: Number(row.others),
+      }));
     } catch (error) {
       this.logger.error("Error building risk pyramid", error);
       throw new InternalServerErrorException("Failed to process risk pyramid");
     }
   }
 
-  async getAgeVsFragility(): Promise<AgeVsFragilityResponse[]> {
+  async getAgeVsFragility(
+    filters: DashboardFilterDto,
+  ): Promise<AgeVsFragilityResponse[]> {
     try {
-      const responses = await this.prisma.questionnaireResponse.findMany({
-        select: {
-          totalScore: true,
-          participant: { select: { birthday: true } },
-        },
-      });
-
-      return responses.map((res) => ({
-        age: this.calculateAge(res.participant.birthday),
-        fragility: res.totalScore,
+      const result = await this.dashboardRepository.getAgeVsFragility(filters);
+      return result.map((row) => ({
+        age: Number(row.age),
+        fragility: Number(row.fragility),
       }));
     } catch (error) {
       this.logger.error("Error fetching age vs fragility data", error);
@@ -241,48 +154,16 @@ export class DashboardService {
     }
   }
 
-  async getDomainPerformanceOverview(): Promise<DomainPerformanceResponse[]> {
+  async getDomainPerformanceOverview(
+    filters: DashboardFilterDto,
+  ): Promise<DomainPerformanceResponse[]> {
     try {
-      const responses = await this.prisma.questionnaireResponse.findMany({
-        select: {
-          participantId: true,
-          answers: {
-            select: {
-              selectedOption: { select: { score: true } },
-              question: { select: { group: { select: { title: true } } } },
-            },
-          },
-        },
-      });
-
-      const domainStats = new Map<
-        string,
-        { totalScore: number; participants: Set<string> }
-      >();
-
-      responses.forEach((response) => {
-        response.answers.forEach((answer) => {
-          const domain = answer.question.group?.title;
-          const score = answer.selectedOption?.score || 0;
-
-          if (!domain) return;
-
-          if (!domainStats.has(domain)) {
-            domainStats.set(domain, { totalScore: 0, participants: new Set() });
-          }
-
-          const stats = domainStats.get(domain)!;
-          stats.totalScore += score;
-          stats.participants.add(response.participantId);
-        });
-      });
-
-      return Array.from(domainStats.entries()).map(([domain, stats]) => ({
-        domain,
-        average: Number(
-          (stats.totalScore / stats.participants.size).toFixed(2),
-        ),
-        evaluatedParticipants: stats.participants.size,
+      const result =
+        await this.dashboardRepository.getDomainPerformanceOverview(filters);
+      return result.map((row) => ({
+        domain: String(row.domain),
+        average: Number(Number(row.average).toFixed(2)),
+        evaluatedParticipants: Number(row.evaluatedParticipants),
       }));
     } catch (error) {
       this.logger.error("Error calculating domain performance", error);
@@ -290,78 +171,16 @@ export class DashboardService {
     }
   }
 
-  async getDomainHeatmap(): Promise<DomainHeatmapResponse[]> {
+  async getDomainHeatmap(
+    filters: DashboardFilterDto,
+  ): Promise<DomainHeatmapResponse[]> {
     try {
-      const responses = await this.prisma.questionnaireResponse.findMany({
-        select: {
-          participant: { select: { user: { select: { gender: true } } } },
-          answers: {
-            select: {
-              selectedOption: { select: { score: true } },
-              question: { select: { group: { select: { title: true } } } },
-            },
-          },
-        },
-      });
-
-      const domainMap = new Map<
-        string,
-        {
-          maleScore: number;
-          maleCount: number;
-          femaleScore: number;
-          femaleCount: number;
-          otherScore: number;
-          otherCount: number;
-        }
-      >();
-
-      responses.forEach((response) => {
-        const gender = response.participant.user.gender;
-
-        response.answers.forEach((answer) => {
-          const domain = answer.question.group?.title;
-          const score = answer.selectedOption?.score || 0;
-
-          if (!domain) return;
-
-          if (!domainMap.has(domain)) {
-            domainMap.set(domain, {
-              maleScore: 0,
-              maleCount: 0,
-              femaleScore: 0,
-              femaleCount: 0,
-              otherScore: 0,
-              otherCount: 0,
-            });
-          }
-
-          const stats = domainMap.get(domain)!;
-
-          if (gender === Gender.MALE) {
-            stats.maleScore += score;
-            stats.maleCount++;
-          } else if (gender === Gender.FEMALE) {
-            stats.femaleScore += score;
-            stats.femaleCount++;
-          } else {
-            stats.otherScore += score;
-            stats.otherCount++;
-          }
-        });
-      });
-
-      return Array.from(domainMap.entries()).map(([domain, stats]) => ({
-        domain,
-        male: stats.maleCount
-          ? Number((stats.maleScore / stats.maleCount).toFixed(2))
-          : 0,
-        female: stats.femaleCount
-          ? Number((stats.femaleScore / stats.femaleCount).toFixed(2))
-          : 0,
-        others: stats.otherCount
-          ? Number((stats.otherScore / stats.otherCount).toFixed(2))
-          : 0,
+      const result = await this.dashboardRepository.getDomainHeatmap(filters);
+      return result.map((row) => ({
+        domain: String(row.domain),
+        male: Number(Number(row.male).toFixed(2)),
+        female: Number(Number(row.female).toFixed(2)),
+        others: Number(Number(row.others).toFixed(2)),
       }));
     } catch (error) {
       this.logger.error("Error building domain heatmap", error);

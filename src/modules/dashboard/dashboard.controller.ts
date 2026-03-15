@@ -14,49 +14,49 @@ export class DashboardController {
 
   @Get("average-score")
   @HttpCode(HttpStatus.OK)
-  async getAverageScore() {
-    return await this.dashboardService.getAverageScore();
+  async getAverageScore(@Query() filters: DashboardFilterDto) {
+    return await this.dashboardService.getAverageScore(filters);
   }
 
   @Get("average-age")
   @HttpCode(HttpStatus.OK)
-  async getAverageAge() {
-    return await this.dashboardService.getAverageAge();
+  async getAverageAge(@Query() filters: DashboardFilterDto) {
+    return await this.dashboardService.getAverageAge(filters);
   }
 
   @Get("age-distribution")
   @HttpCode(HttpStatus.OK)
-  async getAgeDistribution() {
-    return await this.dashboardService.getAgeDistribution();
+  async getAgeDistribution(@Query() filters: DashboardFilterDto) {
+    return await this.dashboardService.getAgeDistribution(filters);
   }
 
   @Get("risk-distribution")
   @HttpCode(HttpStatus.OK)
-  async getRiskDistribution() {
-    return await this.dashboardService.getRiskDistribution();
+  async getRiskDistribution(@Query() filters: DashboardFilterDto) {
+    return await this.dashboardService.getRiskDistribution(filters);
   }
 
   @Get("risk-pyramid")
   @HttpCode(HttpStatus.OK)
-  async getRiskPyramid() {
-    return await this.dashboardService.getRiskPyramid();
+  async getRiskPyramid(@Query() filters: DashboardFilterDto) {
+    return await this.dashboardService.getRiskPyramid(filters);
   }
 
   @Get("age-vs-fragility")
   @HttpCode(HttpStatus.OK)
-  async getAgeVsFragility() {
-    return await this.dashboardService.getAgeVsFragility();
+  async getAgeVsFragility(@Query() filters: DashboardFilterDto) {
+    return await this.dashboardService.getAgeVsFragility(filters);
   }
 
   @Get("domain-performance")
   @HttpCode(HttpStatus.OK)
-  async getDomainPerformanceOverview() {
-    return await this.dashboardService.getDomainPerformanceOverview();
+  async getDomainPerformanceOverview(@Query() filters: DashboardFilterDto) {
+    return await this.dashboardService.getDomainPerformanceOverview(filters);
   }
 
   @Get("domain-heatmap")
   @HttpCode(HttpStatus.OK)
-  async getDomainHeatmap() {
-    return await this.dashboardService.getDomainHeatmap();
+  async getDomainHeatmap(@Query() filters: DashboardFilterDto) {
+    return await this.dashboardService.getDomainHeatmap(filters);
   }
 }
