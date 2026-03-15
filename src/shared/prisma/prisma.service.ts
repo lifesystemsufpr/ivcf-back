@@ -54,7 +54,10 @@ export class PrismaService
 
     // Filtramos campos que são objetos (relações) e não são a extensão 1:1 do User
     const listRelations = dmmfModel.fields.filter(
-      (f) => f.kind === "object" && f.type !== "User",
+      (f) =>
+        f.kind === "object" &&
+        f.type !== "User" &&
+        (!f.relationFromFields || f.relationFromFields.length === 0),
     );
 
     for (const relation of listRelations) {
