@@ -113,7 +113,10 @@ export class DashboardService {
         total: Number(d.total),
       }));
     } catch (error) {
-      this.logger.error("Error calculating risk distribution", error);
+      this.logger.error(
+        "Error calculating risk distribution",
+        (error as Error).stack || (error as Error).message || String(error),
+      );
       throw new InternalServerErrorException(
         "Failed to process risk distribution",
       );
@@ -132,7 +135,10 @@ export class DashboardService {
         others: Number(row.others),
       }));
     } catch (error) {
-      this.logger.error("Error building risk pyramid", error);
+      this.logger.error(
+        "Error building risk pyramid",
+        (error as Error).stack || (error as Error).message || String(error),
+      );
       throw new InternalServerErrorException("Failed to process risk pyramid");
     }
   }
@@ -147,7 +153,10 @@ export class DashboardService {
         fragility: Number(row.fragility),
       }));
     } catch (error) {
-      this.logger.error("Error fetching age vs fragility data", error);
+      this.logger.error(
+        "Error fetching age vs fragility data",
+        (error as Error).stack || (error as Error).message || String(error),
+      );
       throw new InternalServerErrorException(
         "Failed to process fragility correlation",
       );
@@ -166,7 +175,10 @@ export class DashboardService {
         evaluatedParticipants: Number(row.evaluatedParticipants),
       }));
     } catch (error) {
-      this.logger.error("Error calculating domain performance", error);
+      this.logger.error(
+        "Error calculating domain performance",
+        (error as Error).stack || (error as Error).message || String(error),
+      );
       throw new InternalServerErrorException("Failed to process domain data");
     }
   }
@@ -183,7 +195,10 @@ export class DashboardService {
         others: Number(Number(row.others).toFixed(2)),
       }));
     } catch (error) {
-      this.logger.error("Error building domain heatmap", error);
+      this.logger.error(
+        "Error building domain heatmap",
+        (error as Error).stack || (error as Error).message || String(error),
+      );
       throw new InternalServerErrorException("Failed to process heatmap");
     }
   }
