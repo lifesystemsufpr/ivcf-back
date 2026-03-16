@@ -76,3 +76,53 @@ export interface AssessmentDetailResponse {
   domains: IvcfDomainScores;
   rawResponses: Record<string, string>;
 }
+
+export interface FragilityDashboardResponse {
+  summary: {
+    total: number;
+    avgScore: number;
+    avgAge: number;
+    topAgeGroups: Array<{ label: string; value: number }>;
+  };
+  charts: {
+    riskBar: Array<{ category: string; count: number }>;
+    heatmap: Array<{ id: string; data: Array<{ x: string; y: number }> }>;
+    riskPyramid: Array<{
+      group: string;
+      Robusto: number;
+      "Pré-frágil": number;
+      "Frágil": number;
+    }>;
+    scatter: Array<{
+      id: string;
+      data: Array<{
+        x: number;
+        y: number;
+        age: number;
+        sex: string;
+        riskLevel: string;
+        date: string;
+      }>;
+    }>;
+    trend: Array<{ id: string; data: Array<{ x: string; y: number }> }>;
+    domainDrilldown: Array<{
+      id: string;
+      label: string;
+      counts: { sim: number; nao: number };
+      children?: Array<{
+        id: string;
+        label: string;
+        counts: { sim: number; nao: number };
+      }>;
+    }>;
+  };
+  metadata: {
+    ageBounds: { min: number; max: number };
+  };
+}
+
+export interface CurrentMonthStatsResponse {
+  total: number;
+  male: number;
+  female: number;
+}

@@ -416,10 +416,15 @@ async function main() {
     include: {
       groups: {
         include: {
-          questions: { include: { options: true } },
+          questions: { include: { options: true, group: true } },
           subGroups: {
             include: {
-              questions: { include: { options: true } },
+              questions: {
+                include: {
+                  options: true,
+                  subGroup: { include: { group: true } },
+                },
+              },
             },
           },
         },
@@ -550,6 +555,8 @@ async function main() {
     const sex = i % 2 === 0 ? "male" : "female";
     const name = faker.person.fullName({ sex });
     const participantEmail = `paciente${i}@teste.com`;
+    const randomHPId =
+      healthProsIds[Math.floor(Math.random() * healthProsIds.length)];
 
     const participantUser = await prisma.user.create({
       data: {
@@ -572,6 +579,7 @@ async function main() {
             neighborhood: "Batel",
             socio_economic_level: SocialEconomicLevel.C,
             scholarship: Scholarship.HIGH_SCHOOL_COMPLETE,
+            healthProfessionalId: randomHPId,
           },
         },
       },
@@ -579,12 +587,10 @@ async function main() {
     });
 
     if (!participantUser.participant) continue;
-    const participantId: string = participantUser.participant.id;
-    const randomHPId: string =
-      healthProsIds[Math.floor(Math.random() * healthProsIds.length)];
+    const participantId = participantUser.participant.id;
 
     if (Math.random() > 0.2 && ivcfFull) {
-      const responseDate: Date = faker.date.recent({ days: 90 });
+      const responseDate = faker.date.recent({ days: 90 });
       let totalScore = 0;
 
       const answersData: { questionId: string; selectedOptionId: string }[] =
@@ -627,7 +633,7 @@ async function main() {
 
       let classification = "Robusto";
       if (totalScore >= 7 && totalScore <= 14) {
-        classification = "Em Risco de Fragilização";
+        classification = "Pré-frágil";
       } else if (totalScore >= 15) {
         classification = "Frágil";
       }
