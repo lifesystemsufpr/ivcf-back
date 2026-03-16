@@ -1,5 +1,5 @@
 export interface TotalParticipantsResponse {
-  totalParticipantes: number;
+  totalParticipants: number;
 }
 
 export interface AverageScoreResponse {
