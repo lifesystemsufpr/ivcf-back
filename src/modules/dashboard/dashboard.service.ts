@@ -31,7 +31,11 @@ export class DashboardService {
         await this.dashboardRepository.getTotalParticipants(filters);
       return { totalParticipantes: Number(result[0]?.total || 0) };
     } catch (error) {
-      this.logger.error("Error calculating filtered total participants", error);
+      const errorStack = error instanceof Error ? error.stack : String(error);
+      this.logger.error(
+        "Error calculating filtered total participants",
+        errorStack,
+      );
       throw new InternalServerErrorException(
         "Failed to process total participants",
       );
@@ -50,7 +54,8 @@ export class DashboardService {
         totalAssessments: Number(result[0]?.totalAssessments || 0),
       };
     } catch (error) {
-      this.logger.error("Error calculating average score", error);
+      const errorStack = error instanceof Error ? error.stack : String(error);
+      this.logger.error("Error calculating average score", errorStack);
       throw new InternalServerErrorException("Failed to process average score");
     }
   }
@@ -66,7 +71,8 @@ export class DashboardService {
           : 0,
       };
     } catch (error) {
-      this.logger.error("Error calculating average age", error);
+      const errorStack = error instanceof Error ? error.stack : String(error);
+      this.logger.error("Error calculating average age", errorStack);
       throw new InternalServerErrorException("Failed to process average age");
     }
   }
