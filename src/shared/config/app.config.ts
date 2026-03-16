@@ -1,5 +1,5 @@
 import { Logger } from "@nestjs/common";
-import { AppConfig, SecurityConfig } from "./config.interface";
+import { AppConfig, SecurityConfig, EmailConfig } from "./config.interface";
 
 const DEFAULT_EXP_TIME = 86400;
 const SEVEN_DAYS_IN_SECONDS = 604800; // 604800
@@ -33,6 +33,15 @@ export default () => {
       : SEVEN_DAYS_IN_SECONDS,
   };
 
+  const emailConfig: EmailConfig = {
+    smtpHost: process.env.SMTP_HOST || "smtp.gmail.com",
+    smtpPort: process.env.SMTP_PORT ? +process.env.SMTP_PORT : 587,
+    smtpUser: process.env.SMTP_USER || "",
+    smtpPassword: process.env.SMTP_PASSWORD || "",
+    fromAddress: process.env.SMTP_FROM || "noreply@tecnoaging.com",
+    fromName: process.env.SMTP_FROM_NAME || "TecnoAging",
+  };
+
   const appConfig: AppConfig = {
     nest: {
       port: process.env.NEST_PORT ? +process.env.NEST_PORT : 3333,
@@ -58,6 +67,7 @@ export default () => {
       corsOrigins: getCorsOrigins(process.env.CORS_ORIGINS),
     },
     security: securityConfig,
+    email: emailConfig,
   };
 
   const logger = new Logger("AppConfig");

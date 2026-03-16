@@ -3,6 +3,7 @@ export interface AppConfig {
   cors: CorsConfig;
   swagger: SwaggerConfig;
   security: SecurityConfig;
+  email: EmailConfig;
 }
 
 export interface NestConfig {
@@ -17,6 +18,15 @@ export interface SecurityConfig {
   jwtSecret: string;
   jwtExpirationTime: number;
   jwtRefreshExpirationTime: number;
+}
+
+export interface EmailConfig {
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPassword: string;
+  fromAddress: string;
+  fromName: string;
 }
 
 export interface CorsConfig {

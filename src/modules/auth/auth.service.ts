@@ -15,6 +15,7 @@ import {
 } from "src/shared/functions/hash-password";
 import { ConfigService } from "@nestjs/config";
 import { SecurityConfig } from "src/shared/config/config.interface";
+import { EmailService } from "src/shared/services/email.service";
 
 @Injectable()
 export class AuthService {
@@ -24,6 +25,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   async validateCredentials(
@@ -31,8 +33,6 @@ export class AuthService {
     password: string,
   ): Promise<Partial<User> | null> {
     try {
-      const dbUrl = process.env.DATABASE_URL || "NÃO DEFINIDA";
-
       const user = await this.prisma.user.findUnique({
         where: { email },
         select: {
@@ -45,31 +45,14 @@ export class AuthService {
         },
       });
 
-      if (!user) {
-        throw new UnauthorizedException({
-          debug_error: "USUÁRIO_NAO_ENCONTRADO",
-          message: `O e-mail ${email} não retornou nenhum registro.`,
-          server_env: process.env.NODE_ENV,
-          db_check: dbUrl.split("@")[1] || "Url mal formatada ou local",
-        });
-      }
-
-      if (user.active === false) {
-        throw new ForbiddenException({
-          debug_error: "USUARIO_INATIVO",
-          message: "Conta desativada",
-        });
+      if (!user || user.active === false) {
+        throw new UnauthorizedException("Credenciais inválidas");
       }
 
       const isPasswordValid = await comparePassword(password, user.password);
 
       if (!isPasswordValid) {
-        throw new UnauthorizedException({
-          debug_error: "SENHA_INCORRETA",
-          message: "O hash não bateu.",
-          stored_hash_prefix: user.password.substring(0, 10),
-          received_password_len: password.length,
-        });
+        throw new UnauthorizedException("Credenciais inválidas");
       }
 
       const { password: _, ...result } = user;
@@ -81,12 +64,7 @@ export class AuthService {
       ) {
         throw error;
       }
-
-      throw new UnauthorizedException({
-        debug_error: "ERRO_TECNICO_UNCAUGHT",
-        details: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : null,
-      });
+      throw new UnauthorizedException("Ocorreu um erro ao validar o acesso");
     }
   }
 
@@ -196,7 +174,11 @@ export class AuthService {
       this.configService.get<string>("FRONTEND_URL") || "http://localhost:3000";
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&email=${user.email}`;
 
-    this.logger.log(`Link de recuperação gerado para ${email}: ${resetLink}`);
+    await this.emailService.sendPasswordResetEmail(
+      user.email,
+      user.fullName,
+      resetLink,
+    );
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
