@@ -4,6 +4,7 @@ import {
   Logger,
   UnauthorizedException,
   BadRequestException,
+  InternalServerErrorException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { AccessToken, JwtPayload, Payload } from "./interfaces/auth.interface";
@@ -64,7 +65,10 @@ export class AuthService {
       ) {
         throw error;
       }
-      throw new UnauthorizedException("Ocorreu um erro ao validar o acesso");
+      this.logger.error("Erro ao validar credenciais", error as Error);
+      throw new InternalServerErrorException(
+        "Ocorreu um erro ao validar o acesso",
+      );
     }
   }
 
