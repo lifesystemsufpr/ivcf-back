@@ -51,6 +51,7 @@
     "@prisma/client": "^7.2.0",
     "@prisma/config": "^7.4.1",
     "@types/cookie-parser": "^1.4.10",
+    "@types/nodemailer": "^7.0.11",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
@@ -60,6 +61,7 @@
     "date-fns-tz": "^3.2.0",
     "express-basic-auth": "^1.2.1",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^8.0.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
@@ -121,6 +123,9 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    }
   }
 }

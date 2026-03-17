@@ -1,3 +1,10 @@
+/* eslint-disable sonarjs/pseudo-random */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable sonarjs/cognitive-complexity */
+/* eslint-disable sonarjs/no-dead-store */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   PrismaClient,
   SystemRole,
@@ -429,12 +436,19 @@ async function main() {
   if (ivcfFull?.groups) {
     ivcfFull.groups.forEach((group: any) => {
       if (group.questions) {
-        flatQuestions.push(...group.questions);
+        group.questions.forEach((q: any) => {
+          q.group = group;
+          flatQuestions.push(q);
+        });
       }
       if (group.subGroups) {
         group.subGroups.forEach((sub: any) => {
           if (sub.questions) {
-            flatQuestions.push(...sub.questions);
+            sub.questions.forEach((q: any) => {
+              q.subGroup = sub;
+              sub.group = group;
+              flatQuestions.push(q);
+            });
           }
         });
       }
@@ -589,7 +603,7 @@ async function main() {
 
         const isHealthy = Math.random() > 0.4;
         const selectedOption = isHealthy
-          ? question.options.find((o: any) => o.score === 0) ||
+          ? question.options.find((o: { score: number }) => o.score === 0) ||
             question.options[0]
           : question.options[
               Math.floor(Math.random() * question.options.length)

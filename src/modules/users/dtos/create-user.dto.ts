@@ -6,7 +6,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  MaxLength,
   MinLength,
 } from "class-validator";
 
@@ -42,8 +41,8 @@ export class CreateUserDto {
     example: "FEMALE",
   })
   @IsEnum(Gender)
-  @IsNotEmpty()
-  gender: Gender;
+  @IsOptional()
+  gender?: Gender;
 
   @ApiProperty({
     description: "User's role in the system.",

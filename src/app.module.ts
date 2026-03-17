@@ -15,6 +15,7 @@ import { QuestionnairesModule } from "./modules/questionnaire/questionnaire.modu
 import { PrismaModule } from "./shared/prisma/prisma.module";
 import { APP_FILTER } from "@nestjs/core";
 import { PrismaClientExceptionFilter } from "./shared/prisma/filters/prisma-client-exception.filter";
+import { DashboardModule } from "./modules/dashboard/dashboard.module";
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { PrismaClientExceptionFilter } from "./shared/prisma/filters/prisma-clie
     HealthUnitModule,
     InstitutionModule,
     QuestionnairesModule,
+    DashboardModule,
   ],
   providers: [
     ...provideGlobalAppGuards(),

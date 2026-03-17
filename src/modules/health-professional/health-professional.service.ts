@@ -75,8 +75,8 @@ export class HealthProfessionalService extends BaseService<
           id: user.id,
         },
       });
-
-      return { ...user, ...healthProfessional };
+      const { gender: _gender, phone: _phone, ...cleanedUser } = user;
+      return { ...cleanedUser, ...healthProfessional };
     });
   }
 

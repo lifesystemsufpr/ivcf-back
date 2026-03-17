@@ -23,7 +23,6 @@
     "node_modules",
     "dist",
     "test",
-    "**/*spec.ts",
     "src/**/*_OLD/**/*",
     "sequelize_backup/**/*"
   ]

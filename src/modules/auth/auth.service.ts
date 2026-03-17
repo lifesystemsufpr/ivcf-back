@@ -3,14 +3,20 @@ import {
   Injectable,
   Logger,
   UnauthorizedException,
+  BadRequestException,
+  InternalServerErrorException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { AccessToken, JwtPayload, Payload } from "./interfaces/auth.interface";
 import { User } from "@prisma/client";
 import { PrismaService } from "src/shared/prisma/prisma.service";
-import { comparePassword } from "src/shared/functions/hash-password";
+import {
+  comparePassword,
+  hashPassword,
+} from "src/shared/functions/hash-password";
 import { ConfigService } from "@nestjs/config";
 import { SecurityConfig } from "src/shared/config/config.interface";
+import { EmailService } from "src/shared/services/email.service";
 
 @Injectable()
 export class AuthService {
@@ -20,6 +26,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   async validateCredentials(
@@ -27,8 +34,6 @@ export class AuthService {
     password: string,
   ): Promise<Partial<User> | null> {
     try {
-      const dbUrl = process.env.DATABASE_URL || "NÃO DEFINIDA";
-
       const user = await this.prisma.user.findUnique({
         where: { email },
         select: {
@@ -41,31 +46,14 @@ export class AuthService {
         },
       });
 
-      if (!user) {
-        throw new UnauthorizedException({
-          debug_error: "USUÁRIO_NAO_ENCONTRADO",
-          message: `O e-mail ${email} não retornou nenhum registro.`,
-          server_env: process.env.NODE_ENV,
-          db_check: dbUrl.split("@")[1] || "Url mal formatada ou local",
-        });
-      }
-
-      if (user.active === false) {
-        throw new ForbiddenException({
-          debug_error: "USUARIO_INATIVO",
-          message: "Conta desativada",
-        });
+      if (!user || user.active === false) {
+        throw new UnauthorizedException("Credenciais inválidas");
       }
 
       const isPasswordValid = await comparePassword(password, user.password);
 
       if (!isPasswordValid) {
-        throw new UnauthorizedException({
-          debug_error: "SENHA_INCORRETA",
-          message: "O hash não bateu.",
-          stored_hash_prefix: user.password.substring(0, 10),
-          received_password_len: password.length,
-        });
+        throw new UnauthorizedException("Credenciais inválidas");
       }
 
       const { password: _, ...result } = user;
@@ -77,12 +65,10 @@ export class AuthService {
       ) {
         throw error;
       }
-
-      throw new UnauthorizedException({
-        debug_error: "ERRO_TECNICO_UNCAUGHT",
-        details: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : null,
-      });
+      this.logger.error("Erro ao validar credenciais", error as Error);
+      throw new InternalServerErrorException(
+        "Ocorreu um erro ao validar o acesso",
+      );
     }
   }
 
@@ -168,5 +154,81 @@ export class AuthService {
       return null;
     }
     return user;
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return;
+    }
+
+    const securityConfig =
+      this.configService.getOrThrow<SecurityConfig>("security");
+
+    const payload = { sub: user.id, email: user.email };
+    const resetToken = await this.jwtService.signAsync(payload, {
+      secret: securityConfig.jwtSecret + user.password,
+      expiresIn: "15m",
+    });
+
+    const frontendUrl =
+      this.configService.get<string>("FRONTEND_URL") || "http://localhost:3000";
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&email=${user.email}`;
+
+    await this.emailService.sendPasswordResetEmail(
+      user.email,
+      user.fullName,
+      resetLink,
+    );
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const isTokenValidFormat = (
+      tokenPayload: unknown,
+    ): tokenPayload is { sub: string } => {
+      return (
+        typeof tokenPayload === "object" &&
+        tokenPayload !== null &&
+        "sub" in tokenPayload &&
+        typeof (tokenPayload as Record<string, unknown>).sub === "string"
+      );
+    };
+
+    const decodedToken: unknown = this.jwtService.decode(token);
+
+    if (!isTokenValidFormat(decodedToken)) {
+      throw new BadRequestException("Token mal formatado.");
+    }
+
+    const { sub } = decodedToken;
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: sub },
+    });
+
+    if (!user) {
+      throw new BadRequestException("Usuário não encontrado.");
+    }
+
+    const securityConfig =
+      this.configService.getOrThrow<SecurityConfig>("security");
+
+    try {
+      await this.jwtService.verifyAsync(token, {
+        secret: securityConfig.jwtSecret + user.password,
+      });
+    } catch {
+      throw new BadRequestException("Token inválido ou expirado.");
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
   }
 }

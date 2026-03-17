@@ -8,11 +8,13 @@ import { ConfigService } from "@nestjs/config";
 import { SecurityConfig } from "src/shared/config/config.interface";
 import { JwtStrategy } from "./strategy/jwt.strategy";
 import { AuthController } from "./auth.controller";
+import { SharedModule } from "src/shared/shared.module";
 
 @Module({
   providers: [AuthService, LocalStrategy, JwtStrategy],
   imports: [
     UserModule,
+    SharedModule,
     PassportModule,
     JwtModule.registerAsync({
       useFactory: (config: ConfigService) => {
