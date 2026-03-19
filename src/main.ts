@@ -19,7 +19,8 @@ import basicAuth = require("express-basic-auth");
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix("backend");
+  const globalPrefix = "backend";
+  app.setGlobalPrefix(globalPrefix);
   const logger = new Logger("AppInitializer");
 
   app.use(json({ limit: "50mb" }));
@@ -51,9 +52,15 @@ async function bootstrap() {
     logger.log("Swagger enabled");
 
     const swaggerPath = swaggerConfig.path;
+    const swaggerRoutes = [
+      `/${swaggerPath}`,
+      `/${swaggerPath}-json`,
+      `/${globalPrefix}/${swaggerPath}`,
+      `/${globalPrefix}/${swaggerPath}-json`,
+    ];
 
     app.use(
-      [`/${swaggerPath}`, `/${swaggerPath}-json`],
+      swaggerRoutes,
       basicAuth({
         challenge: true,
         users: {

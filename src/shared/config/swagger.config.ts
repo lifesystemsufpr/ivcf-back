@@ -7,11 +7,24 @@ export function setupSwagger(app: INestApplication, config: SwaggerConfig) {
     .setTitle(config.title)
     .setDescription(config.description)
     .setVersion(config.version)
-    .addBearerAuth();
+    .addBearerAuth(
+      {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        in: "header",
+        name: "Authorization",
+      },
+      "access-token",
+    )
+    .addSecurityRequirements("access-token");
 
   const document = SwaggerModule.createDocument(app, builder.build());
 
   SwaggerModule.setup(config.path, app, document, {
     useGlobalPrefix: true,
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
   });
 }
