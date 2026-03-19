@@ -29,7 +29,7 @@ export class DashboardService {
     try {
       const result =
         await this.dashboardRepository.getTotalParticipants(filters);
-      return { totalParticipantes: Number(result[0]?.total || 0) };
+      return { totalParticipants: Number(result[0]?.total || 0) };
     } catch (error) {
       const errorStack = error instanceof Error ? error.stack : String(error);
       this.logger.error(

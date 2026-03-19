@@ -1,4 +1,11 @@
-import { IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsDateString,
+  IsIn,
+} from "class-validator";
 import { Type } from "class-transformer";
 import { Gender } from "@prisma/client";
 
@@ -10,12 +17,24 @@ export class DashboardFilterDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  minAge?: number;
+  ageMin?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  maxAge?: number;
+  ageMax?: number;
+
+  @IsOptional()
+  @IsDateString()
+  start?: string;
+
+  @IsOptional()
+  @IsDateString()
+  end?: string;
+
+  @IsOptional()
+  @IsIn(["sex", "ageGroup"])
+  stratification?: "sex" | "ageGroup";
 
   @IsOptional()
   @IsString()
