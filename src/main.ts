@@ -70,7 +70,10 @@ async function bootstrap() {
       }),
     );
 
-    setupSwagger(app, swaggerConfig);
+    setupSwagger(app, {
+      ...swaggerConfig,
+      path: `${globalPrefix}/${swaggerConfig.path}`,
+    });
   }
 
   if (corsConfig.enabled) {
