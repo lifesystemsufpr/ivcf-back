@@ -19,19 +19,21 @@ import type {
 
 @Injectable()
 export class QuestionnaireService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
-  private static readonly DOMAIN_LABELS: Record<keyof IvcfDomainScores, string> =
-    {
-      age: "Idade",
-      selfPerception: "Autopercepção da Saúde",
-      functionalCapacity: "Capacidade Funcional",
-      cognition: "Cognição",
-      mood: "Humor",
-      mobility: "Mobilidade",
-      communication: "Comunicação",
-      comorbidities: "Comorbidades",
-    };
+  private static readonly DOMAIN_LABELS: Record<
+    keyof IvcfDomainScores,
+    string
+  > = {
+    age: "Idade",
+    selfPerception: "Autopercepção da Saúde",
+    functionalCapacity: "Capacidade Funcional",
+    cognition: "Cognição",
+    mood: "Humor",
+    mobility: "Mobilidade",
+    communication: "Comunicação",
+    comorbidities: "Comorbidades",
+  };
 
   async getIvcfStructure() {
     return await this.prisma.questionnaire.findUnique({
@@ -375,16 +377,16 @@ export class QuestionnaireService {
     number,
     keyof IvcfDomainScores
   > = {
-      1: "age",
-      2: "selfPerception",
-      3: "functionalCapacity",
-      4: "functionalCapacity",
-      5: "cognition",
-      6: "mood",
-      7: "mobility",
-      8: "communication",
-      9: "comorbidities",
-    };
+    1: "age",
+    2: "selfPerception",
+    3: "functionalCapacity",
+    4: "functionalCapacity",
+    5: "cognition",
+    6: "mood",
+    7: "mobility",
+    8: "communication",
+    9: "comorbidities",
+  };
 
   private static readonly GROUP_CAPS: Record<number, number> = {
     3: 4,
@@ -457,14 +459,16 @@ export class QuestionnaireService {
         ON q."id" = qr."questionnaireId"
       WHERE qr."healthProfessionalId" = ${healthProfessionalId}
         AND q."slug" = 'ivcf-20'
-        ${query.start
-        ? Prisma.sql`AND qr."date" >= ${new Date(query.start)}`
-        : Prisma.empty
-      }
-        ${query.end
-        ? Prisma.sql`AND qr."date" <= ${new Date(query.end)}`
-        : Prisma.empty
-      }
+        ${
+          query.start
+            ? Prisma.sql`AND qr."date" >= ${new Date(query.start)}`
+            : Prisma.empty
+        }
+        ${
+          query.end
+            ? Prisma.sql`AND qr."date" <= ${new Date(query.end)}`
+            : Prisma.empty
+        }
       ORDER BY qr."participantId", qr."createdAt" DESC
     `;
 
@@ -478,7 +482,7 @@ export class QuestionnaireService {
       where: { id: { in: ids } },
       include: {
         participant: {
-          include: { user: { select: { gender: true, fullName: true } } },
+          include: { user: { select: { fullName: true } } },
         },
         answers: {
           include: {
@@ -508,7 +512,7 @@ export class QuestionnaireService {
     const assessments = responses
       .map((response) => {
         const age = this.getAge(response.participant.birthday);
-        const sex = this.mapGenderToSex(response.participant.user.gender);
+        const sex = this.mapGenderToSex(response.participant.gender);
         const scores = this.computeDomainsFromAnswers(response.answers);
         const riskLevel = this.classifyRisk(scores.totalScore);
 
@@ -775,43 +779,44 @@ export class QuestionnaireService {
         ? ["60-74", "75-84", "85+"]
         : ["Masculino", "Feminino"];
 
-    const heatmap = Object.entries(
-      QuestionnaireService.DOMAIN_LABELS,
-    ).map(([key, label]) => {
-      return {
-        id: label,
-        data: groups.map((group) => {
-          const groupAssessments = assessments.filter((assessment) => {
-            if (stratification === "ageGroup") {
-              if (group === "60-74") {
-                return assessment.age <= 74;
+    const heatmap = Object.entries(QuestionnaireService.DOMAIN_LABELS).map(
+      ([key, label]) => {
+        return {
+          id: label,
+          data: groups.map((group) => {
+            const groupAssessments = assessments.filter((assessment) => {
+              if (stratification === "ageGroup") {
+                if (group === "60-74") {
+                  return assessment.age <= 74;
+                }
+                if (group === "75-84") {
+                  return assessment.age > 74 && assessment.age <= 84;
+                }
+                return assessment.age > 84;
               }
-              if (group === "75-84") {
-                return assessment.age > 74 && assessment.age <= 84;
-              }
-              return assessment.age > 84;
-            }
-            return group === "Masculino"
-              ? assessment.sex === "M"
-              : assessment.sex === "F";
-          });
+              return group === "Masculino"
+                ? assessment.sex === "M"
+                : assessment.sex === "F";
+            });
 
-          const sum = groupAssessments.reduce(
-            (acc, assessment) => acc + assessment.domains[key as keyof IvcfDomainScores],
-            0,
-          );
+            const sum = groupAssessments.reduce(
+              (acc, assessment) =>
+                acc + assessment.domains[key as keyof IvcfDomainScores],
+              0,
+            );
 
-          const avg = groupAssessments.length > 0 ? sum / groupAssessments.length : 0;
+            const avg =
+              groupAssessments.length > 0 ? sum / groupAssessments.length : 0;
 
-          return { x: group, y: Number(avg.toFixed(2)) };
-        }),
-      };
-    });
+            return { x: group, y: Number(avg.toFixed(2)) };
+          }),
+        };
+      },
+    );
 
     const riskPyramid =
       stratification === "ageGroup"
-        ? ["60-74", "75-84", "85+"]
-          .map((group) => {
+        ? ["60-74", "75-84", "85+"].map((group) => {
             const groupAssessments = assessments.filter((assessment) => {
               if (group === "60-74") {
                 return assessment.age <= 74;
@@ -824,37 +829,33 @@ export class QuestionnaireService {
 
             return {
               group,
-              Robusto: groupAssessments.filter(
-                (a) => a.riskLevel === "Robusto",
-              ).length,
+              Robusto: groupAssessments.filter((a) => a.riskLevel === "Robusto")
+                .length,
               "Pré-frágil": groupAssessments.filter(
                 (a) => a.riskLevel === "Pré-frágil",
               ).length,
-              "Frágil": groupAssessments.filter(
-                (a) => a.riskLevel === "Frágil",
-              ).length,
+              Frágil: groupAssessments.filter((a) => a.riskLevel === "Frágil")
+                .length,
             };
           })
         : ["Masculino", "Feminino"].map((group) => {
-          const groupAssessments = assessments.filter((assessment) =>
-            group === "Masculino"
-              ? assessment.sex === "M"
-              : assessment.sex === "F",
-          );
+            const groupAssessments = assessments.filter((assessment) =>
+              group === "Masculino"
+                ? assessment.sex === "M"
+                : assessment.sex === "F",
+            );
 
-          return {
-            group,
-            Robusto: groupAssessments.filter(
-              (a) => a.riskLevel === "Robusto",
-            ).length,
-            "Pré-frágil": groupAssessments.filter(
-              (a) => a.riskLevel === "Pré-frágil",
-            ).length,
-            "Frágil": groupAssessments.filter(
-              (a) => a.riskLevel === "Frágil",
-            ).length,
-          };
-        });
+            return {
+              group,
+              Robusto: groupAssessments.filter((a) => a.riskLevel === "Robusto")
+                .length,
+              "Pré-frágil": groupAssessments.filter(
+                (a) => a.riskLevel === "Pré-frágil",
+              ).length,
+              Frágil: groupAssessments.filter((a) => a.riskLevel === "Frágil")
+                .length,
+            };
+          });
 
     const domainDrilldown = this.buildDomainDrilldown(assessments);
 
@@ -992,8 +993,7 @@ export class QuestionnaireService {
       return `${date.getFullYear()}-${month}`;
     };
 
-    return this.prisma
-      .$queryRaw<{ month: Date; total: number }[]>`
+    return this.prisma.$queryRaw<{ month: Date; total: number }[]>`
         SELECT date_trunc('month', qr."createdAt") AS month,
                COUNT(*)::int AS total
         FROM "questionnaire_response" AS qr
@@ -1002,23 +1002,22 @@ export class QuestionnaireService {
           AND qr."createdAt" < ${end}
         GROUP BY 1
         ORDER BY 1
-      `
-      .then((rows) => {
-        const counts = new Map(
-          rows.map((row) => [monthKey(new Date(row.month)), row.total]),
-        );
+      `.then((rows) => {
+      const counts = new Map(
+        rows.map((row) => [monthKey(new Date(row.month)), row.total]),
+      );
 
-        const data = Array.from({ length: 12 }).map((_, index) => {
-          const date = new Date(start.getFullYear(), start.getMonth() + index, 1);
-          const key = monthKey(date);
-          return {
-            x: `${key}-01`,
-            y: counts.get(key) || 0,
-          };
-        });
-
-        return [{ id: "Cohort", data }];
+      const data = Array.from({ length: 12 }).map((_, index) => {
+        const date = new Date(start.getFullYear(), start.getMonth() + index, 1);
+        const key = monthKey(date);
+        return {
+          x: `${key}-01`,
+          y: counts.get(key) || 0,
+        };
       });
+
+      return [{ id: "Cohort", data }];
+    });
   }
 
   async getCurrentMonthStats(
@@ -1040,7 +1039,7 @@ export class QuestionnaireService {
       select: {
         participant: {
           select: {
-            user: { select: { gender: true } },
+            gender: true,
           },
         },
       },
@@ -1050,9 +1049,9 @@ export class QuestionnaireService {
     let female = 0;
 
     for (const row of rows) {
-      if (row.participant.user.gender === Gender.MALE) {
+      if (row.participant.gender === Gender.MALE) {
         male += 1;
-      } else if (row.participant.user.gender === Gender.FEMALE) {
+      } else if (row.participant.gender === Gender.FEMALE) {
         female += 1;
       }
     }
@@ -1185,12 +1184,12 @@ export class QuestionnaireService {
       totalAssessments: assessments.length,
       lastAssessment: last
         ? {
-          id: last.id,
-          date: last.date,
-          totalScore: last.totalScore,
-          riskLevel: last.riskLevel,
-          domains: last.domains,
-        }
+            id: last.id,
+            date: last.date,
+            totalScore: last.totalScore,
+            riskLevel: last.riskLevel,
+            domains: last.domains,
+          }
         : null,
     };
   }

@@ -7,24 +7,16 @@ import { CreateResearcherDto } from "./dto/create-researcher.dto";
 import { UpdateResearcherDto } from "./dto/update-researcher.dto";
 import { PrismaService } from "src/shared/prisma/prisma.service";
 import { UserService } from "../users/user.service";
-import {
-  Institution,
-  Prisma,
-  Researcher,
-  SystemRole,
-  User,
-} from "@prisma/client";
+import { Prisma, Researcher, SystemRole, User } from "@prisma/client";
 import { BaseService } from "src/shared/services/base.service";
 import { QueryDto } from "src/shared/dto/query.dto";
 
 type ResearcherWithDetails = Researcher & {
   user: User;
-  institution: Institution;
 };
 
 export type ResearcherResponse = Omit<Researcher, "userId" | "institutionId"> &
-  Omit<User, "password"> &
-  Omit<Institution, "id" | "title"> & { institutionName: string };
+  Omit<User, "password">;
 
 @Injectable()
 export class ResearcherService extends BaseService<
@@ -48,18 +40,11 @@ export class ResearcherService extends BaseService<
 
   protected transform(researcher: ResearcherWithDetails): ResearcherResponse {
     const { password: _password, ...userData } = researcher.user;
-    const { title, title_normalized } = researcher.institution;
-    const {
-      user: _user,
-      institution: _institution,
-      ...researcherData
-    } = researcher;
+    const { user: _user, ...researcherData } = researcher;
 
     return {
       ...userData,
       ...researcherData,
-      institutionName: title,
-      title_normalized: title_normalized,
     };
   }
 
@@ -123,7 +108,6 @@ export class ResearcherService extends BaseService<
         },
         include: {
           user: true,
-          institution: true,
         },
       });
 
@@ -184,7 +168,7 @@ export class ResearcherService extends BaseService<
           const researcher = await tx.researcher.update({
             where: { id },
             data: { active: false },
-            include: { user: true, institution: true },
+            include: { user: true },
           });
 
           await this.userService.update(id, { active: false }, tx);

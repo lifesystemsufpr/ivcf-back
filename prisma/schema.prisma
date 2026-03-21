@@ -13,9 +13,7 @@ model User {
   fullName_normalized String     @default("") @db.Text
   password            String
   active              Boolean    @default(true)
-  gender              Gender?
   role                SystemRole
-  phone               String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -38,26 +36,9 @@ model Researcher {
   updatedAt DateTime @default(now()) @updatedAt
 
   user        User        @relation(fields: [id], references: [id])
-  institution Institution @relation(fields: [institutionId], references: [id])
 
   @@index([institutionId])
   @@map("researcher")
-}
-
-model Institution {
-  id               String  @id @default(uuid())
-  title            String
-  title_normalized String  @default("") @db.Text
-  active           Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  researchers Researcher[]
-
-  @@index([title_normalized])
-  @@index([active])
-  @@map("institution")
 }
 
 model HealthProfessional {
@@ -79,27 +60,6 @@ model HealthProfessional {
   @@map("health_professional")
 }
 
-model HealthcareUnit {
-  id              String  @id @default(uuid())
-  name            String
-  name_normalized String  @default("") @db.Text
-  zipCode         String
-  street          String
-  number          String
-  complement      String?
-  city            String
-  state           String
-  neighborhood    String
-  active          Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  @@index([name_normalized])
-  @@index([active])
-  @@map("healthcare_unit")
-}
-
 model Participant {
   id                   String              @id @unique
   birthday             DateTime            @db.Date
@@ -113,8 +73,7 @@ model Participant {
   state                String
   neighborhood         String
   active               Boolean             @default(true)
-  socio_economic_level SocialEconomicLevel
-  scholarship          Scholarship
+  gender Gender
   healthProfessionalId String
 
   createdAt DateTime @default(now())
@@ -273,25 +232,4 @@ enum Gender {
   MALE
   FEMALE
   OTHER
-}
-
-enum Scholarship {
-  NONE
-  FUNDAMENTAL_INCOMPLETE
-  FUNDAMENTAL_COMPLETE
-  HIGH_SCHOOL_INCOMPLETE
-  HIGH_SCHOOL_COMPLETE
-  HIGHER_EDUCATION_INCOMPLETE
-  HIGHER_EDUCATION_COMPLETE
-  POSTGRADUATE
-  MASTERS
-  DOCTORATE
-}
-
-enum SocialEconomicLevel {
-  A
-  B
-  C
-  D
-  E
 }
