@@ -126,3 +126,26 @@ export interface CurrentMonthStatsResponse {
   male: number;
   female: number;
 }
+
+export type FragilityAssessmentRow = {
+  id: string;
+  participantId: string;
+  participantName: string;
+  healthProfessionalId: string;
+  age: number;
+  sex: "M" | "F" | null;
+  score: number;
+  riskLevel: "Robusto" | "Pré-frágil" | "Frágil";
+  date: string;
+  domains: IvcfDomainScores;
+  answers: Array<{
+    valueText: string | null;
+    selectedOption: { score: number; label: string } | null;
+    question: {
+      id: string;
+      statement: string;
+      group?: { order: number } | null;
+      subGroup?: { group: { order: number } } | null;
+    };
+  }>;
+};
