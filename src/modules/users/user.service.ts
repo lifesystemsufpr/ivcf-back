@@ -27,11 +27,14 @@ export class UserService {
     try {
       const user = await prisma.user.create({
         data: {
-          ...userData,
+          email: userData.email,
+          role: userData.role,
           fullName,
           fullName_normalized: normalizedFullName,
-          active: true,
           password: hashedPassword,
+          active: (userData.active as boolean | undefined) ?? true,
+          phone: userData.phone ?? null,
+          gender: userData.gender ?? null,
         },
       });
 

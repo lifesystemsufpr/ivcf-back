@@ -54,7 +54,7 @@ export class HealthProfessionalService extends BaseService<
       const {
         user: createUser,
         speciality,
-        ...createHealthProfessional
+        ...healthProfessionalData
       } = createHealthProfessionalDto;
 
       const user = await this.userService.createUser(
@@ -69,14 +69,17 @@ export class HealthProfessionalService extends BaseService<
 
       const healthProfessional = await tx.healthProfessional.create({
         data: {
-          ...createHealthProfessional,
+          ...healthProfessionalData,
           speciality,
           speciality_normalized: normalizedSpeciality,
           id: user.id,
         },
       });
-      const { gender: _gender, phone: _phone, ...cleanedUser } = user;
-      return { ...cleanedUser, ...healthProfessional };
+
+      return {
+        ...user,
+        ...healthProfessional,
+      };
     });
   }
 
