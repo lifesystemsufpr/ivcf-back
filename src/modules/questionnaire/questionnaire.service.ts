@@ -15,25 +15,24 @@ import type {
   ScoreHistoryResponse,
   DomainHistoryResponse,
   AssessmentDetailResponse,
+  FragilityAssessmentRow,
 } from "./interfaces/ivcf-evolution.interface";
 
 @Injectable()
 export class QuestionnaireService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
-  private static readonly DOMAIN_LABELS: Record<
-    keyof IvcfDomainScores,
-    string
-  > = {
-    age: "Idade",
-    selfPerception: "Autopercepção da Saúde",
-    functionalCapacity: "Capacidade Funcional",
-    cognition: "Cognição",
-    mood: "Humor",
-    mobility: "Mobilidade",
-    communication: "Comunicação",
-    comorbidities: "Comorbidades",
-  };
+  private static readonly DOMAIN_LABELS: Record<keyof IvcfDomainScores, string> =
+    {
+      age: "Idade",
+      selfPerception: "Autopercepção da Saúde",
+      functionalCapacity: "Capacidade Funcional",
+      cognition: "Cognição",
+      mood: "Humor",
+      mobility: "Mobilidade",
+      communication: "Comunicação",
+      comorbidities: "Comorbidades",
+    };
 
   async getIvcfStructure() {
     return await this.prisma.questionnaire.findUnique({
@@ -377,16 +376,16 @@ export class QuestionnaireService {
     number,
     keyof IvcfDomainScores
   > = {
-    1: "age",
-    2: "selfPerception",
-    3: "functionalCapacity",
-    4: "functionalCapacity",
-    5: "cognition",
-    6: "mood",
-    7: "mobility",
-    8: "communication",
-    9: "comorbidities",
-  };
+      1: "age",
+      2: "selfPerception",
+      3: "functionalCapacity",
+      4: "functionalCapacity",
+      5: "cognition",
+      6: "mood",
+      7: "mobility",
+      8: "communication",
+      9: "comorbidities",
+    };
 
   private static readonly GROUP_CAPS: Record<number, number> = {
     3: 4,
@@ -451,6 +450,39 @@ export class QuestionnaireService {
     healthProfessionalId: string,
     query: FragilityDashboardQueryDto,
   ): Promise<FragilityDashboardResponse> {
+    const stratification = query.stratification || "ageGroup";
+    const { assessments, hadResponses } = await this.getFragilityAssessments(
+      healthProfessionalId,
+      query,
+    );
+
+    if (assessments.length === 0 && !hadResponses) {
+      return this.buildEmptyDashboard();
+    }
+
+    return await this.buildDashboardFromAssessments(
+      assessments,
+      stratification,
+      healthProfessionalId,
+    );
+  }
+
+  async exportFragilityDashboardCsv(
+    healthProfessionalId: string,
+    query: FragilityDashboardQueryDto,
+  ) {
+    const { assessments } = await this.getFragilityAssessments(
+      healthProfessionalId,
+      query,
+    );
+
+    return this.buildFragilityCsv(assessments);
+  }
+
+  private async getFragilityAssessments(
+    healthProfessionalId: string,
+    query: FragilityDashboardQueryDto,
+  ): Promise<{ assessments: FragilityAssessmentRow[]; hadResponses: boolean }> {
     const responseIds = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT DISTINCT ON (qr."participantId")
         qr."id"
@@ -459,30 +491,33 @@ export class QuestionnaireService {
         ON q."id" = qr."questionnaireId"
       WHERE qr."healthProfessionalId" = ${healthProfessionalId}
         AND q."slug" = 'ivcf-20'
-        ${
-          query.start
-            ? Prisma.sql`AND qr."date" >= ${new Date(query.start)}`
-            : Prisma.empty
-        }
-        ${
-          query.end
-            ? Prisma.sql`AND qr."date" <= ${new Date(query.end)}`
-            : Prisma.empty
-        }
+        ${query.start
+        ? Prisma.sql`AND qr."date" >= ${new Date(query.start)}`
+        : Prisma.empty
+      }
+        ${query.end
+        ? Prisma.sql`AND qr."date" <= ${new Date(query.end)}`
+        : Prisma.empty
+      }
       ORDER BY qr."participantId", qr."createdAt" DESC
     `;
 
     const ids = responseIds.map((row) => row.id);
 
     if (ids.length === 0) {
-      return this.buildEmptyDashboard();
+      return { assessments: [], hadResponses: false };
     }
 
     const responses = await this.prisma.questionnaireResponse.findMany({
       where: { id: { in: ids } },
       include: {
         participant: {
-          include: { user: { select: { fullName: true } } },
+          select: {
+            id: true,
+            birthday: true,
+            gender: true,
+            user: { select: { fullName: true } },
+          },
         },
         answers: {
           include: {
@@ -504,7 +539,6 @@ export class QuestionnaireService {
       },
     });
 
-    const stratification = query.stratification || "ageGroup";
     const sexFilter = query.sex && query.sex !== "all" ? query.sex : undefined;
     const ageMin = query.ageMin;
     const ageMax = query.ageMax;
@@ -518,13 +552,20 @@ export class QuestionnaireService {
 
         return {
           id: response.id,
+          participantId: response.participant.id,
+          participantName: response.participant.user.fullName,
+          healthProfessionalId,
           age,
           sex,
           score: scores.totalScore,
           riskLevel,
           date: response.date.toISOString(),
           domains: scores.domains,
-          answers: response.answers,
+          answers: response.answers.map((answer) => ({
+            valueText: answer.valueText,
+            selectedOption: answer.selectedOption,
+            question: answer.question,
+          })),
         };
       })
       .filter((assessment) => {
@@ -540,11 +581,100 @@ export class QuestionnaireService {
         return true;
       });
 
-    return await this.buildDashboardFromAssessments(
-      assessments,
-      stratification,
-      healthProfessionalId,
-    );
+    return { assessments, hadResponses: true };
+  }
+
+  private buildFragilityCsv(assessments: FragilityAssessmentRow[]) {
+    const escapeValue = (value: unknown) => {
+      if (value === null || value === undefined) {
+        return "";
+      }
+      const str = String(value);
+      if (/[",\n\r]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const questionMap = new Map<string, string>();
+
+    for (const assessment of assessments) {
+      for (const answer of assessment.answers) {
+        if (!questionMap.has(answer.question.id)) {
+          questionMap.set(answer.question.id, answer.question.statement);
+        }
+      }
+    }
+
+    const questionColumns = Array.from(questionMap.entries())
+      .sort((a, b) => {
+        const statementDiff = a[1].localeCompare(b[1]);
+        if (statementDiff !== 0) {
+          return statementDiff;
+        }
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([id, statement]) => ({
+        id,
+        header: `question_${id}: ${statement}`,
+      }));
+
+    const headers = [
+      "assessmentId",
+      "participantId",
+      "participantName",
+      "healthProfessionalId",
+      "sex",
+      "age",
+      "date",
+      "totalScore",
+      "riskLevel",
+      "domain_age",
+      "domain_selfPerception",
+      "domain_functionalCapacity",
+      "domain_cognition",
+      "domain_mood",
+      "domain_mobility",
+      "domain_communication",
+      "domain_comorbidities",
+      ...questionColumns.map((col) => col.header),
+    ];
+
+    const lines: string[] = [headers.map(escapeValue).join(",")];
+
+    for (const assessment of assessments) {
+      const answerMap = new Map<string, string>();
+      for (const answer of assessment.answers) {
+        const value =
+          answer.selectedOption?.label || answer.valueText || "";
+        answerMap.set(answer.question.id, value);
+      }
+
+      const row = [
+        assessment.id,
+        assessment.participantId,
+        assessment.participantName,
+        assessment.healthProfessionalId,
+        assessment.sex || "",
+        assessment.age,
+        assessment.date,
+        assessment.score,
+        assessment.riskLevel,
+        assessment.domains.age,
+        assessment.domains.selfPerception,
+        assessment.domains.functionalCapacity,
+        assessment.domains.cognition,
+        assessment.domains.mood,
+        assessment.domains.mobility,
+        assessment.domains.communication,
+        assessment.domains.comorbidities,
+        ...questionColumns.map((col) => answerMap.get(col.id) || ""),
+      ];
+
+      lines.push(row.map(escapeValue).join(","));
+    }
+
+    return `${lines.join("\r\n")}\r\n`;
   }
 
   private computeAssessment(
@@ -730,19 +860,19 @@ export class QuestionnaireService {
 
     const riskBar = total
       ? [
-          {
-            category: "Robusto",
-            count: riskCounts.Robusto,
-          },
-          {
-            category: "Pré-frágil",
-            count: riskCounts["Pré-frágil"],
-          },
-          {
-            category: "Frágil",
-            count: riskCounts["Frágil"],
-          },
-        ]
+        {
+          category: "Robusto",
+          count: riskCounts.Robusto,
+        },
+        {
+          category: "Pré-frágil",
+          count: riskCounts["Pré-frágil"],
+        },
+        {
+          category: "Frágil",
+          count: riskCounts["Frágil"],
+        },
+      ]
       : [];
 
     const scatter = [
@@ -779,44 +909,43 @@ export class QuestionnaireService {
         ? ["60-74", "75-84", "85+"]
         : ["Masculino", "Feminino"];
 
-    const heatmap = Object.entries(QuestionnaireService.DOMAIN_LABELS).map(
-      ([key, label]) => {
-        return {
-          id: label,
-          data: groups.map((group) => {
-            const groupAssessments = assessments.filter((assessment) => {
-              if (stratification === "ageGroup") {
-                if (group === "60-74") {
-                  return assessment.age <= 74;
-                }
-                if (group === "75-84") {
-                  return assessment.age > 74 && assessment.age <= 84;
-                }
-                return assessment.age > 84;
+    const heatmap = Object.entries(
+      QuestionnaireService.DOMAIN_LABELS,
+    ).map(([key, label]) => {
+      return {
+        id: label,
+        data: groups.map((group) => {
+          const groupAssessments = assessments.filter((assessment) => {
+            if (stratification === "ageGroup") {
+              if (group === "60-74") {
+                return assessment.age <= 74;
               }
-              return group === "Masculino"
-                ? assessment.sex === "M"
-                : assessment.sex === "F";
-            });
+              if (group === "75-84") {
+                return assessment.age > 74 && assessment.age <= 84;
+              }
+              return assessment.age > 84;
+            }
+            return group === "Masculino"
+              ? assessment.sex === "M"
+              : assessment.sex === "F";
+          });
 
-            const sum = groupAssessments.reduce(
-              (acc, assessment) =>
-                acc + assessment.domains[key as keyof IvcfDomainScores],
-              0,
-            );
+          const sum = groupAssessments.reduce(
+            (acc, assessment) => acc + assessment.domains[key as keyof IvcfDomainScores],
+            0,
+          );
 
-            const avg =
-              groupAssessments.length > 0 ? sum / groupAssessments.length : 0;
+          const avg = groupAssessments.length > 0 ? sum / groupAssessments.length : 0;
 
-            return { x: group, y: Number(avg.toFixed(2)) };
-          }),
-        };
-      },
-    );
+          return { x: group, y: Number(avg.toFixed(2)) };
+        }),
+      };
+    });
 
     const riskPyramid =
       stratification === "ageGroup"
-        ? ["60-74", "75-84", "85+"].map((group) => {
+        ? ["60-74", "75-84", "85+"]
+          .map((group) => {
             const groupAssessments = assessments.filter((assessment) => {
               if (group === "60-74") {
                 return assessment.age <= 74;
@@ -829,33 +958,37 @@ export class QuestionnaireService {
 
             return {
               group,
-              Robusto: groupAssessments.filter((a) => a.riskLevel === "Robusto")
-                .length,
+              Robusto: groupAssessments.filter(
+                (a) => a.riskLevel === "Robusto",
+              ).length,
               "Pré-frágil": groupAssessments.filter(
                 (a) => a.riskLevel === "Pré-frágil",
               ).length,
-              Frágil: groupAssessments.filter((a) => a.riskLevel === "Frágil")
-                .length,
+              "Frágil": groupAssessments.filter(
+                (a) => a.riskLevel === "Frágil",
+              ).length,
             };
           })
         : ["Masculino", "Feminino"].map((group) => {
-            const groupAssessments = assessments.filter((assessment) =>
-              group === "Masculino"
-                ? assessment.sex === "M"
-                : assessment.sex === "F",
-            );
+          const groupAssessments = assessments.filter((assessment) =>
+            group === "Masculino"
+              ? assessment.sex === "M"
+              : assessment.sex === "F",
+          );
 
-            return {
-              group,
-              Robusto: groupAssessments.filter((a) => a.riskLevel === "Robusto")
-                .length,
-              "Pré-frágil": groupAssessments.filter(
-                (a) => a.riskLevel === "Pré-frágil",
-              ).length,
-              Frágil: groupAssessments.filter((a) => a.riskLevel === "Frágil")
-                .length,
-            };
-          });
+          return {
+            group,
+            Robusto: groupAssessments.filter(
+              (a) => a.riskLevel === "Robusto",
+            ).length,
+            "Pré-frágil": groupAssessments.filter(
+              (a) => a.riskLevel === "Pré-frágil",
+            ).length,
+            "Frágil": groupAssessments.filter(
+              (a) => a.riskLevel === "Frágil",
+            ).length,
+          };
+        });
 
     const domainDrilldown = this.buildDomainDrilldown(assessments);
 
@@ -993,7 +1126,8 @@ export class QuestionnaireService {
       return `${date.getFullYear()}-${month}`;
     };
 
-    return this.prisma.$queryRaw<{ month: Date; total: number }[]>`
+    return this.prisma
+      .$queryRaw<{ month: Date; total: number }[]>`
         SELECT date_trunc('month', qr."createdAt") AS month,
                COUNT(*)::int AS total
         FROM "questionnaire_response" AS qr
@@ -1002,22 +1136,23 @@ export class QuestionnaireService {
           AND qr."createdAt" < ${end}
         GROUP BY 1
         ORDER BY 1
-      `.then((rows) => {
-      const counts = new Map(
-        rows.map((row) => [monthKey(new Date(row.month)), row.total]),
-      );
+      `
+      .then((rows) => {
+        const counts = new Map(
+          rows.map((row) => [monthKey(new Date(row.month)), row.total]),
+        );
 
-      const data = Array.from({ length: 12 }).map((_, index) => {
-        const date = new Date(start.getFullYear(), start.getMonth() + index, 1);
-        const key = monthKey(date);
-        return {
-          x: `${key}-01`,
-          y: counts.get(key) || 0,
-        };
+        const data = Array.from({ length: 12 }).map((_, index) => {
+          const date = new Date(start.getFullYear(), start.getMonth() + index, 1);
+          const key = monthKey(date);
+          return {
+            x: `${key}-01`,
+            y: counts.get(key) || 0,
+          };
+        });
+
+        return [{ id: "Cohort", data }];
       });
-
-      return [{ id: "Cohort", data }];
-    });
   }
 
   async getCurrentMonthStats(
@@ -1040,6 +1175,7 @@ export class QuestionnaireService {
         participant: {
           select: {
             gender: true,
+            user: { select: { fullName: true } },
           },
         },
       },
@@ -1184,12 +1320,12 @@ export class QuestionnaireService {
       totalAssessments: assessments.length,
       lastAssessment: last
         ? {
-            id: last.id,
-            date: last.date,
-            totalScore: last.totalScore,
-            riskLevel: last.riskLevel,
-            domains: last.domains,
-          }
+          id: last.id,
+          date: last.date,
+          totalScore: last.totalScore,
+          riskLevel: last.riskLevel,
+          domains: last.domains,
+        }
         : null,
     };
   }
