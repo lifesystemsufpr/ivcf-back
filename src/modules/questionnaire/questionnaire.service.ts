@@ -15,6 +15,7 @@ import type {
   ScoreHistoryResponse,
   DomainHistoryResponse,
   AssessmentDetailResponse,
+  FragilityAssessmentRow,
 } from "./interfaces/ivcf-evolution.interface";
 
 @Injectable()
@@ -449,6 +450,39 @@ export class QuestionnaireService {
     healthProfessionalId: string,
     query: FragilityDashboardQueryDto,
   ): Promise<FragilityDashboardResponse> {
+    const stratification = query.stratification || "ageGroup";
+    const { assessments, hadResponses } = await this.getFragilityAssessments(
+      healthProfessionalId,
+      query,
+    );
+
+    if (assessments.length === 0 && !hadResponses) {
+      return this.buildEmptyDashboard();
+    }
+
+    return await this.buildDashboardFromAssessments(
+      assessments,
+      stratification,
+      healthProfessionalId,
+    );
+  }
+
+  async exportFragilityDashboardCsv(
+    healthProfessionalId: string,
+    query: FragilityDashboardQueryDto,
+  ) {
+    const { assessments } = await this.getFragilityAssessments(
+      healthProfessionalId,
+      query,
+    );
+
+    return this.buildFragilityCsv(assessments);
+  }
+
+  private async getFragilityAssessments(
+    healthProfessionalId: string,
+    query: FragilityDashboardQueryDto,
+  ): Promise<{ assessments: FragilityAssessmentRow[]; hadResponses: boolean }> {
     const responseIds = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT DISTINCT ON (qr."participantId")
         qr."id"
@@ -471,14 +505,19 @@ export class QuestionnaireService {
     const ids = responseIds.map((row) => row.id);
 
     if (ids.length === 0) {
-      return this.buildEmptyDashboard();
+      return { assessments: [], hadResponses: false };
     }
 
     const responses = await this.prisma.questionnaireResponse.findMany({
       where: { id: { in: ids } },
       include: {
         participant: {
-          include: { user: { select: { gender: true, fullName: true } } },
+          select: {
+            id: true,
+            birthday: true,
+            gender: true,
+            user: { select: { fullName: true } },
+          },
         },
         answers: {
           include: {
@@ -500,7 +539,6 @@ export class QuestionnaireService {
       },
     });
 
-    const stratification = query.stratification || "ageGroup";
     const sexFilter = query.sex && query.sex !== "all" ? query.sex : undefined;
     const ageMin = query.ageMin;
     const ageMax = query.ageMax;
@@ -508,19 +546,26 @@ export class QuestionnaireService {
     const assessments = responses
       .map((response) => {
         const age = this.getAge(response.participant.birthday);
-        const sex = this.mapGenderToSex(response.participant.user.gender);
+        const sex = this.mapGenderToSex(response.participant.gender);
         const scores = this.computeDomainsFromAnswers(response.answers);
         const riskLevel = this.classifyRisk(scores.totalScore);
 
         return {
           id: response.id,
+          participantId: response.participant.id,
+          participantName: response.participant.user.fullName,
+          healthProfessionalId,
           age,
           sex,
           score: scores.totalScore,
           riskLevel,
           date: response.date.toISOString(),
           domains: scores.domains,
-          answers: response.answers,
+          answers: response.answers.map((answer) => ({
+            valueText: answer.valueText,
+            selectedOption: answer.selectedOption,
+            question: answer.question,
+          })),
         };
       })
       .filter((assessment) => {
@@ -536,11 +581,100 @@ export class QuestionnaireService {
         return true;
       });
 
-    return await this.buildDashboardFromAssessments(
-      assessments,
-      stratification,
-      healthProfessionalId,
-    );
+    return { assessments, hadResponses: true };
+  }
+
+  private buildFragilityCsv(assessments: FragilityAssessmentRow[]) {
+    const escapeValue = (value: unknown) => {
+      if (value === null || value === undefined) {
+        return "";
+      }
+      const str = String(value);
+      if (/[",\n\r]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const questionMap = new Map<string, string>();
+
+    for (const assessment of assessments) {
+      for (const answer of assessment.answers) {
+        if (!questionMap.has(answer.question.id)) {
+          questionMap.set(answer.question.id, answer.question.statement);
+        }
+      }
+    }
+
+    const questionColumns = Array.from(questionMap.entries())
+      .sort((a, b) => {
+        const statementDiff = a[1].localeCompare(b[1]);
+        if (statementDiff !== 0) {
+          return statementDiff;
+        }
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([id, statement]) => ({
+        id,
+        header: `question_${id}: ${statement}`,
+      }));
+
+    const headers = [
+      "assessmentId",
+      "participantId",
+      "participantName",
+      "healthProfessionalId",
+      "sex",
+      "age",
+      "date",
+      "totalScore",
+      "riskLevel",
+      "domain_age",
+      "domain_selfPerception",
+      "domain_functionalCapacity",
+      "domain_cognition",
+      "domain_mood",
+      "domain_mobility",
+      "domain_communication",
+      "domain_comorbidities",
+      ...questionColumns.map((col) => col.header),
+    ];
+
+    const lines: string[] = [headers.map(escapeValue).join(",")];
+
+    for (const assessment of assessments) {
+      const answerMap = new Map<string, string>();
+      for (const answer of assessment.answers) {
+        const value =
+          answer.selectedOption?.label || answer.valueText || "";
+        answerMap.set(answer.question.id, value);
+      }
+
+      const row = [
+        assessment.id,
+        assessment.participantId,
+        assessment.participantName,
+        assessment.healthProfessionalId,
+        assessment.sex || "",
+        assessment.age,
+        assessment.date,
+        assessment.score,
+        assessment.riskLevel,
+        assessment.domains.age,
+        assessment.domains.selfPerception,
+        assessment.domains.functionalCapacity,
+        assessment.domains.cognition,
+        assessment.domains.mood,
+        assessment.domains.mobility,
+        assessment.domains.communication,
+        assessment.domains.comorbidities,
+        ...questionColumns.map((col) => answerMap.get(col.id) || ""),
+      ];
+
+      lines.push(row.map(escapeValue).join(","));
+    }
+
+    return `${lines.join("\r\n")}\r\n`;
   }
 
   private computeAssessment(
@@ -726,19 +860,19 @@ export class QuestionnaireService {
 
     const riskBar = total
       ? [
-          {
-            category: "Robusto",
-            count: riskCounts.Robusto,
-          },
-          {
-            category: "Pré-frágil",
-            count: riskCounts["Pré-frágil"],
-          },
-          {
-            category: "Frágil",
-            count: riskCounts["Frágil"],
-          },
-        ]
+        {
+          category: "Robusto",
+          count: riskCounts.Robusto,
+        },
+        {
+          category: "Pré-frágil",
+          count: riskCounts["Pré-frágil"],
+        },
+        {
+          category: "Frágil",
+          count: riskCounts["Frágil"],
+        },
+      ]
       : [];
 
     const scatter = [
@@ -1040,7 +1174,8 @@ export class QuestionnaireService {
       select: {
         participant: {
           select: {
-            user: { select: { gender: true } },
+            gender: true,
+            user: { select: { fullName: true } },
           },
         },
       },
@@ -1050,9 +1185,9 @@ export class QuestionnaireService {
     let female = 0;
 
     for (const row of rows) {
-      if (row.participant.user.gender === Gender.MALE) {
+      if (row.participant.gender === Gender.MALE) {
         male += 1;
-      } else if (row.participant.user.gender === Gender.FEMALE) {
+      } else if (row.participant.gender === Gender.FEMALE) {
         female += 1;
       }
     }

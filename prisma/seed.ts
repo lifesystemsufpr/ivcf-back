@@ -5,14 +5,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import {
-  PrismaClient,
-  SystemRole,
-  Gender,
-  Scholarship,
-  SocialEconomicLevel,
-  QuestionType,
-} from "@prisma/client";
+import { PrismaClient, SystemRole, Gender, QuestionType } from "@prisma/client";
 import { hashPassword } from "../src/shared/functions/hash-password";
 import { normalizeString } from "../src/shared/functions/normalize-string";
 import { fakerPT_BR as faker } from "@faker-js/faker";
@@ -42,8 +35,6 @@ async function main() {
   await prisma.researcher.deleteMany({});
   await prisma.healthProfessional.deleteMany({});
   await prisma.user.deleteMany({});
-  await prisma.institution.deleteMany({});
-  await prisma.healthcareUnit.deleteMany({});
 
   console.log("📝 Criando Questionário IVCF-20 Estrutural...");
 
@@ -464,7 +455,6 @@ async function main() {
       email: "medico@sistema.com",
       fullName: "Dra. Ana Fixa",
       fullName_normalized: "dra. ana fixa",
-      gender: Gender.FEMALE,
       password: passwordHash,
       role: SystemRole.HEALTH_PROFESSIONAL,
       healthProfessional: {
@@ -485,41 +475,6 @@ async function main() {
 
   console.log("🏥 Criando Estrutura...");
 
-  await prisma.institution.create({
-    data: {
-      title: "UFPR",
-      title_normalized: normalizeString("UFPR") || "ufpr",
-    },
-  });
-
-  const units = await Promise.all([
-    prisma.healthcareUnit.create({
-      data: {
-        name: "UBS Centro",
-        name_normalized: normalizeString("UBS Centro") || "ubs centro",
-        zipCode: "80000000",
-        street: "Rua XV",
-        number: "10",
-        city: "Curitiba",
-        state: "PR",
-        neighborhood: "Centro",
-      },
-    }),
-    prisma.healthcareUnit.create({
-      data: {
-        name: "Hospital de Clínicas",
-        name_normalized:
-          normalizeString("Hospital de Clínicas") || "hospital de clinicas",
-        zipCode: "80060000",
-        street: "General Carneiro",
-        number: "181",
-        city: "Curitiba",
-        state: "PR",
-        neighborhood: "Alto da Glória",
-      },
-    }),
-  ]);
-
   console.log("👨‍⚕️ Criando Profissionais Aleatórios...");
   for (let i = 0; i < 5; i++) {
     const name = faker.person.fullName();
@@ -530,7 +485,6 @@ async function main() {
         email: hpEmail,
         fullName: name,
         fullName_normalized: normalizeString(name) || name.toLowerCase(),
-        gender: i % 2 === 0 ? Gender.MALE : Gender.FEMALE,
         password: passwordHash,
         role: SystemRole.HEALTH_PROFESSIONAL,
         healthProfessional: {
@@ -563,7 +517,6 @@ async function main() {
         email: participantEmail,
         fullName: name,
         fullName_normalized: normalizeString(name) || name.toLowerCase(),
-        gender: sex === "male" ? Gender.MALE : Gender.FEMALE,
         password: passwordHash,
         role: SystemRole.PARTICIPANT,
         participant: {
@@ -577,8 +530,7 @@ async function main() {
             city: "Curitiba",
             state: "PR",
             neighborhood: "Batel",
-            socio_economic_level: SocialEconomicLevel.C,
-            scholarship: Scholarship.HIGH_SCHOOL_COMPLETE,
+            gender: sex === "male" ? Gender.MALE : Gender.FEMALE,
             healthProfessionalId: randomHPId,
           },
         },

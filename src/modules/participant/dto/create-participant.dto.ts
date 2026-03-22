@@ -1,5 +1,5 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
-import { Scholarship, SocialEconomicLevel } from "@prisma/client";
+import { Gender } from "@prisma/client";
 import { Type } from "class-transformer";
 import {
   IsDate,
@@ -33,22 +33,6 @@ export class CreateParticipantDto {
     message: "A data de nascimento não pode ser uma data futura.",
   })
   birthday: Date;
-
-  @ApiProperty({
-    description: "The scholarship status of the participant",
-    example: "HIGHER_EDUCATION_COMPLETE",
-  })
-  @IsNotEmpty()
-  @IsEnum(Scholarship)
-  scholarship: Scholarship;
-
-  @ApiProperty({
-    description: "The socio-economic level of the participant",
-    example: "C",
-  })
-  @IsNotEmpty()
-  @IsEnum(SocialEconomicLevel)
-  socio_economic_level: SocialEconomicLevel;
 
   @ApiProperty({
     description: "The weight of the participant",
@@ -120,4 +104,12 @@ export class CreateParticipantDto {
   @IsNotEmpty()
   @IsString()
   state: string;
+
+  @ApiProperty({
+    description: "The gender of the participant",
+    example: "MALE",
+  })
+  @IsNotEmpty()
+  @IsEnum(Gender)
+  gender: Gender;
 }
