@@ -7,8 +7,6 @@ import { UserService } from "./modules/users/user.service";
 import { UserModule } from "./modules/users/user.module";
 import { ResearcherModule } from "./modules/researcher/researcher.module";
 import { HealthProfessionalModule } from "./modules/health-professional/health-professional.module";
-import { HealthUnitModule } from "./modules/health-unit/health-unit.module";
-import { InstitutionModule } from "./modules/institution/institution.module";
 import provideGlobalAppGuards from "./modules/auth/providers/global-guards.provider";
 import { ParticipantModule } from "./modules/participant/participant.module";
 import { QuestionnairesModule } from "./modules/questionnaire/questionnaire.module";
@@ -32,8 +30,6 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     ResearcherModule,
     HealthProfessionalModule,
     ParticipantModule,
-    HealthUnitModule,
-    InstitutionModule,
     QuestionnairesModule,
     DashboardModule,
   ],
