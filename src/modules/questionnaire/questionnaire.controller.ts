@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, Query } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  Res,
+  StreamableFile,
+} from "@nestjs/common";
+import type { Response } from "express";
 import { QuestionnaireService } from "./questionnaire.service";
 import { CreateResponseDto } from "./dto/create-response.dto";
 import { FilterQuestionnaireResponseDto } from "./dto/filter-questionnaire-response.dto";
@@ -77,6 +87,25 @@ export class QuestionnaireController {
     @Query() query: FragilityDashboardQueryDto,
   ): Promise<FragilityDashboardResponse> {
     return this.service.getFragilityDashboard(user.id, query);
+  }
+
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
+  @Get("dashboard/export")
+  async exportFragilityDashboardCsv(
+    @RequestUser() user: Payload,
+    @Query() query: FragilityDashboardQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const csv = await this.service.exportFragilityDashboardCsv(user.id, query);
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `ivcf-dashboard-${date}.csv`;
+
+    res.set({
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename=\"${filename}\"`,
+    });
+
+    return new StreamableFile(Buffer.from(csv, "utf8"));
   }
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
