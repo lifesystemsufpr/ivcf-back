@@ -27,24 +27,6 @@ export class CreateUserDto {
   email: string;
 
   @ApiProperty({
-    description: "User's phone number (optional).",
-    example: "41999998888",
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  phone?: string;
-
-  @ApiProperty({
-    description: "User's gender.",
-    enum: Gender,
-    example: "FEMALE",
-  })
-  @IsEnum(Gender)
-  @IsOptional()
-  gender?: Gender;
-
-  @ApiProperty({
     description: "User's role in the system.",
     enum: SystemRole,
     example: "PARTICIPANT",

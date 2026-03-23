@@ -33,8 +33,6 @@ export class UserService {
           fullName_normalized: normalizedFullName,
           password: hashedPassword,
           active: (userData.active as boolean | undefined) ?? true,
-          phone: userData.phone ?? null,
-          gender: userData.gender ?? null,
         },
       });
 
