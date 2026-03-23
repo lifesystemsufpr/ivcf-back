@@ -531,7 +531,11 @@ async function main() {
             state: "PR",
             neighborhood: "Batel",
             gender: sex === "male" ? Gender.MALE : Gender.FEMALE,
-            healthProfessionalId: randomHPId,
+            healthProfessionalsLinks: {
+              create: {
+                healthProfessionalId: randomHPId,
+              },
+            },
           },
         },
       },
