@@ -84,7 +84,9 @@ export class ParticipantService extends BaseService<
     const customWhere = {
       active: true,
       user: { active: true },
-      healthProfessionalId,
+      healthProfessionalsLinks: {
+        some: { healthProfessionalId },
+      },
     };
 
     console.time("findAll-prisma-query");
@@ -144,10 +146,12 @@ export class ParticipantService extends BaseService<
       );
     }
 
-    const participantWithUser = await prismaClient.participant.findFirstOrThrow({
-     where,
-     include: { user: true },
-    });
+    const participantWithUser = await prismaClient.participant.findFirstOrThrow(
+      {
+        where,
+        include: { user: true },
+      },
+    );
 
     return this.transform(participantWithUser);
   }
