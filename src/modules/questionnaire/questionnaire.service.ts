@@ -494,7 +494,9 @@ export class QuestionnaireService {
       FROM "questionnaire_response" AS qr
       INNER JOIN "questionnaire" AS q
         ON q."id" = qr."questionnaireId"
-      WHERE qr."healthProfessionalId" = ${healthProfessionalId}
+      INNER JOIN "health_professional_participant" AS hpp
+        ON hpp."participantId" = qr."participantId"
+      WHERE hpp."healthProfessionalId" = ${healthProfessionalId}
         AND q."slug" = 'ivcf-20'
         ${query.start
         ? Prisma.sql`AND qr."date" >= ${new Date(query.start)}`
@@ -1136,7 +1138,12 @@ export class QuestionnaireService {
         SELECT date_trunc('month', qr."createdAt") AS month,
                COUNT(*)::int AS total
         FROM "questionnaire_response" AS qr
-        WHERE qr."healthProfessionalId" = ${healthProfessionalId}
+        INNER JOIN "questionnaire" AS q
+          ON q."id" = qr."questionnaireId"
+        INNER JOIN "health_professional_participant" AS hpp
+          ON hpp."participantId" = qr."participantId"
+        WHERE hpp."healthProfessionalId" = ${healthProfessionalId}
+          AND q."slug" = 'ivcf-20'
           AND qr."createdAt" >= ${start}
           AND qr."createdAt" < ${end}
         GROUP BY 1
@@ -1167,9 +1174,25 @@ export class QuestionnaireService {
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
+    const links = await this.prisma.$queryRaw<{ participantId: string }[]>`
+      SELECT hpp."participantId"
+      FROM "health_professional_participant" AS hpp
+      WHERE hpp."healthProfessionalId" = ${healthProfessionalId}
+    `;
+
+    const participantIds = links.map((link) => link.participantId);
+
+    if (participantIds.length === 0) {
+      return {
+        total: 0,
+        male: 0,
+        female: 0,
+      };
+    }
+
     const rows = await this.prisma.questionnaireResponse.findMany({
       where: {
-        healthProfessionalId,
+        participantId: { in: participantIds },
         createdAt: {
           gte: start,
           lt: end,
