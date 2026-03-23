@@ -60,4 +60,10 @@ export class ParticipantController {
   remove(@RequestUser() user: Payload, @Param("id") id: string) {
     return this.participantService.remove(id, user);
   }
+
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
+  @Get("/check-email/:email")
+  findAssessments(@RequestUser() user: Payload, @Param("email") email: string) {
+    return this.participantService.checkEmail(email);
+  }
 }

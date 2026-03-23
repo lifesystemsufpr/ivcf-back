@@ -15,3 +15,9 @@ export class UpdateHealthProfessionalDto extends PartialType(
   @Type(() => UpdateUserDto)
   user?: UpdateUserDto;
 }
+
+export class LinkParticipantDto {
+  @ValidateNested()
+  @Type(() => String)
+  participantId: string;
+}
