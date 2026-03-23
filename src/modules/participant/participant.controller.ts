@@ -17,8 +17,8 @@ import { SystemRole } from "@prisma/client";
 import { QueryDto } from "src/shared/dto/query.dto";
 import { RequestUser } from "../auth/decorators/request-user.decorator";
 import { Payload } from "../auth/interfaces/auth.interface";
+
 @Controller("participant")
-@ApiBearerAuth()
 export class ParticipantController {
   constructor(private readonly participantService: ParticipantService) {}
 
@@ -62,8 +62,8 @@ export class ParticipantController {
   }
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
-  @Get("/check-email/:email")
-  findAssessments(@RequestUser() user: Payload, @Param("email") email: string) {
+  @Get("check-email/:email")
+  checkEmail(@RequestUser() user: Payload, @Param("email") email: string) {
     return this.participantService.checkEmail(email);
   }
 }

@@ -4,7 +4,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { CreateHealthProfessionalDto } from "./dto/create-health-professional.dto";
-import {LinkParticipantDto, UpdateHealthProfessionalDto} from "./dto/update-health-professional.dto";
+import {
+  LinkParticipantDto,
+  UpdateHealthProfessionalDto,
+} from "./dto/update-health-professional.dto";
 import { PrismaService } from "src/shared/prisma/prisma.service";
 import { UserService } from "../users/user.service";
 import { HealthProfessional, Prisma, SystemRole, User } from "@prisma/client";
@@ -239,6 +242,7 @@ export class HealthProfessionalService extends BaseService<
     healthProfessionalId: string,
   ) {
     const { participantId } = linkParticipantDto;
+    console.log(participantId, healthProfessionalId);
 
     return this.prisma.healthProfessionalParticipant.create({
       data: {
