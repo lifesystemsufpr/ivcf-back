@@ -45,7 +45,7 @@ export class ParticipantService extends BaseService<
     createParticipantDto: CreateParticipantDto,
     healthProfessionalId: string,
   ) {
-    return await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       const {
         user: userData,
         birthday,
@@ -68,8 +68,12 @@ export class ParticipantService extends BaseService<
         data: {
           ...participantData,
           birthday,
-          healthProfessionalId,
           id: user.id,
+          healthProfessionalsLinks: {
+            create: {
+              healthProfessionalId,
+            },
+          },
         },
       });
 
@@ -129,7 +133,9 @@ export class ParticipantService extends BaseService<
     };
 
     if (requestUser?.role === SystemRole.HEALTH_PROFESSIONAL) {
-      where.healthProfessionalId = requestUser.id;
+      where.healthProfessionalsLinks = {
+        some: { healthProfessionalId: requestUser.id },
+      };
     }
 
     if (requestUser?.role === SystemRole.PARTICIPANT && requestUser.id !== id) {
@@ -138,11 +144,10 @@ export class ParticipantService extends BaseService<
       );
     }
 
-    const participantWithUser =
-      await prismaClient.participant.findFirstOrThrow({
-        where,
-        include: { user: true },
-      });
+    const participantWithUser = await prismaClient.participant.findFirstOrThrow({
+     where,
+     include: { user: true },
+    });
 
     return this.transform(participantWithUser);
   }
@@ -276,5 +281,23 @@ export class ParticipantService extends BaseService<
 
   async checkDeletability(id: string) {
     return await this.prisma.checkDeletionSafety("Participant", id);
+  }
+
+  async checkEmail(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        participant: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException({ message: "Email not found" });
+    }
+
+    return { userId: user.id, participantId: user.participant?.id };
   }
 }

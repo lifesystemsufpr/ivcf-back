@@ -51,8 +51,9 @@ model HealthProfessional {
   updatedAt DateTime @default(now()) @updatedAt
 
   appliedQuestionnaires QuestionnaireResponse[]
-  participants          Participant[]
-  user                  User                    @relation(fields: [id], references: [id])
+  user                  User @relation(fields: [id], references: [id])
+
+  participantsLinks HealthProfessionalParticipant[]
 
   @@index([speciality])
   @@index([speciality_normalized])
@@ -61,30 +62,43 @@ model HealthProfessional {
 }
 
 model Participant {
-  id                   String              @id @unique
-  birthday             DateTime            @db.Date
-  weight               Int                 @default(0)
-  height               Int                 @default(0)
-  zipCode              String
-  street               String
-  number               String
-  complement           String?
-  city                 String
-  state                String
-  neighborhood         String
-  active               Boolean             @default(true)
-  gender Gender
-  healthProfessionalId String
+  id           String   @id @unique
+  birthday     DateTime @db.Date
+  weight       Int      @default(0)
+  height       Int      @default(0)
+  zipCode      String
+  street       String
+  number       String
+  complement   String?
+  city         String
+  state        String
+  neighborhood String
+  active       Boolean  @default(true)
+  gender       Gender
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
   questionnaireResponses QuestionnaireResponse[]
-  healthProfessional     HealthProfessional @relation(fields: [healthProfessionalId], references: [id])
-  user                   User               @relation(fields: [id], references: [id])
+  user                   User @relation(fields: [id], references: [id])
 
-  @@index([healthProfessionalId])
+  healthProfessionalsLinks HealthProfessionalParticipant[]
+
   @@map("participant")
+}
+
+model HealthProfessionalParticipant {
+  healthProfessionalId String
+  participantId        String
+
+  createdAt DateTime @default(now())
+
+  healthProfessional HealthProfessional @relation(fields: [healthProfessionalId], references: [id], onDelete: Cascade)
+  participant        Participant        @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@id([healthProfessionalId, participantId])
+  @@index([participantId])
+  @@map("health_professional_participant")
 }
 
 model Questionnaire {

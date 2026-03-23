@@ -15,9 +15,9 @@ export function setupSwagger(app: INestApplication, config: SwaggerConfig) {
         in: "header",
         name: "Authorization",
       },
-      "access-token",
+      "bearer",
     )
-    .addSecurityRequirements("access-token");
+    .addSecurityRequirements("bearer");
 
   const document = SwaggerModule.createDocument(app, builder.build());
 
