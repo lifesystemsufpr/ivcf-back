@@ -141,7 +141,10 @@ export class QuestionnaireService {
     });
   }
 
-  async findAll(filters: FilterQuestionnaireResponseDto) {
+  async findAll(
+    filters: FilterQuestionnaireResponseDto,
+    healthProfessionalId: string,
+  ) {
     const {
       page = 1,
       pageSize = 10,
@@ -158,7 +161,9 @@ export class QuestionnaireService {
     const skip = (page - 1) * pageSize;
     const take = pageSize;
 
-    const conditions: Prisma.QuestionnaireResponseWhereInput[] = [];
+    const conditions: Prisma.QuestionnaireResponseWhereInput[] = [
+      { healthProfessionalId },
+    ];
 
     if (participantEmail) {
       conditions.push({

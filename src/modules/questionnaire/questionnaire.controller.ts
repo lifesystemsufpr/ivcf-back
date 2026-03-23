@@ -31,9 +31,13 @@ export class QuestionnaireController {
     return this.service.getIvcfStructure();
   }
 
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Get()
-  findAll(@Query() query: FilterQuestionnaireResponseDto) {
-    return this.service.findAll(query);
+  findAll(
+    @RequestUser() user: Payload,
+    @Query() query: FilterQuestionnaireResponseDto,
+  ) {
+    return this.service.findAll(query, user.id);
   }
 
   // TODO: Adicionar roles e registrar healthProfessional basedo no token
