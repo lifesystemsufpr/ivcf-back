@@ -34,6 +34,8 @@ export class QuestionnaireService {
       comorbidities: "Comorbidades",
     };
 
+  private static readonly MULTI_SELECT_QUESTION_ORDERS = new Set([14, 20]);
+
   async getIvcfStructure() {
     return await this.prisma.questionnaire.findUnique({
       where: { slug: "ivcf-20" },
@@ -61,27 +63,63 @@ export class QuestionnaireService {
   }
 
   async createResponse(dto: CreateResponseDto) {
-    const optionIds = dto.answers
-      .filter((a) => a.selectedOptionId)
-      .map((a) => a.selectedOptionId);
+    // Normaliza o payload para um formato único: 1 linha por opção marcada.
+    const normalizedAnswers: Array<{
+      questionId: string;
+      selectedOptionId?: string;
+      valueText?: string;
+    }> = [];
+
+    for (const answer of dto.answers) {
+      const optionIds = this.normalizeSelectedOptionIds(answer);
+
+      if (optionIds.length > 0) {
+        for (const selectedOptionId of optionIds) {
+          normalizedAnswers.push({
+            questionId: answer.questionId,
+            selectedOptionId,
+            valueText: answer.valueText,
+          });
+        }
+        continue;
+      }
+
+      normalizedAnswers.push({
+        questionId: answer.questionId,
+        valueText: answer.valueText,
+      });
+    }
+
+    // Busca apenas ids válidos para cálculo de score.
+    const optionIds = normalizedAnswers
+      .map((a) => a.selectedOptionId)
+      .filter((id): id is string => Boolean(id));
 
     const selectedOptions = await this.prisma.questionOption.findMany({
       where: { id: { in: optionIds as string[] } },
       include: {
         question: {
-          include: {
+          select: {
+            id: true,
+            order: true,
             group: true,
             subGroup: {
-              include: { group: true },
+              select: { group: true },
             },
           },
         },
       },
     });
 
-    if (selectedOptions.length === 0) {
+    if (optionIds.length > 0 && selectedOptions.length === 0) {
       throw new NotFoundException("Nenhuma opção válida encontrada.");
     }
+
+    // Acumula por questão para evitar soma indevida quando houver múltiplas opções.
+    const scoresByQuestion: Record<
+      string,
+      { score: number; order: number; groupId: string }
+    > = {};
 
     const scoresByGroup: Record<string, { score: number; order: number }> = {};
 
@@ -89,11 +127,38 @@ export class QuestionnaireService {
       const group = option.question.group || option.question.subGroup?.group;
 
       if (group) {
-        if (!scoresByGroup[group.id]) {
-          scoresByGroup[group.id] = { score: 0, order: group.order };
+        const questionId = option.question.id;
+        if (!scoresByQuestion[questionId]) {
+          scoresByQuestion[questionId] = {
+            score: 0,
+            order: group.order,
+            groupId: group.id,
+          };
         }
-        scoresByGroup[group.id].score += option.score;
+
+        if (this.shouldCapQuestionAtMaxOption(option.question.order)) {
+          // Para questões 14 e 20, múltiplas marcações representam condições no mesmo critério.
+          // Neste caso usamos o maior score da questão, não a soma de todos.
+          scoresByQuestion[questionId].score = Math.max(
+            scoresByQuestion[questionId].score,
+            option.score,
+          );
+          continue;
+        }
+
+        scoresByQuestion[questionId].score += option.score;
       }
+    }
+
+    for (const questionScore of Object.values(scoresByQuestion)) {
+      if (!scoresByGroup[questionScore.groupId]) {
+        scoresByGroup[questionScore.groupId] = {
+          score: 0,
+          order: questionScore.order,
+        };
+      }
+
+      scoresByGroup[questionScore.groupId].score += questionScore.score;
     }
 
     let finalScore = 0;
@@ -131,11 +196,7 @@ export class QuestionnaireService {
         totalScore: finalScore,
         classification: classification,
         answers: {
-          create: dto.answers.map((ans) => ({
-            questionId: ans.questionId,
-            selectedOptionId: ans.selectedOptionId,
-            valueText: ans.valueText,
-          })),
+          create: normalizedAnswers,
         },
       },
     });
@@ -436,6 +497,7 @@ export class QuestionnaireService {
             selectedOption: { select: { score: true, label: true } },
             question: {
               select: {
+                order: true,
                 statement: true,
                 group: { select: { order: true } },
                 subGroup: {
@@ -532,6 +594,7 @@ export class QuestionnaireService {
             question: {
               select: {
                 id: true,
+                order: true,
                 statement: true,
                 group: { select: { order: true } },
                 subGroup: {
@@ -654,7 +717,22 @@ export class QuestionnaireService {
       for (const answer of assessment.answers) {
         const value =
           answer.selectedOption?.label || answer.valueText || "";
-        answerMap.set(answer.question.id, value);
+
+        if (!value) {
+          continue;
+        }
+
+        const current = answerMap.get(answer.question.id);
+        if (!current) {
+          answerMap.set(answer.question.id, value);
+          continue;
+        }
+
+        // Mantém todas as respostas da mesma pergunta no CSV, sem duplicar labels.
+        const values = current.split("; ");
+        if (!values.includes(value)) {
+          answerMap.set(answer.question.id, `${current}; ${value}`);
+        }
       }
 
       const row = [
@@ -687,22 +765,56 @@ export class QuestionnaireService {
   private computeAssessment(
     response: Awaited<ReturnType<typeof this.getIvcfResponsesQuery>>[number],
   ): IvcfAssessment {
+    // Primeiro consolida score por questão; depois aplica os tetos por grupo.
+    const scoresByQuestion = new Map<
+      string,
+      { groupOrder: number; questionOrder: number; score: number }
+    >();
     const scoresByGroupOrder: Record<number, number> = {};
     const rawResponses: Record<string, string> = {};
 
     for (const answer of response.answers) {
       const groupOrder =
         answer.question.group?.order ?? answer.question.subGroup?.group?.order;
+      const questionOrder = answer.question.order;
 
       if (groupOrder !== undefined && answer.selectedOption) {
-        scoresByGroupOrder[groupOrder] =
-          (scoresByGroupOrder[groupOrder] || 0) + answer.selectedOption.score;
+        const current = scoresByQuestion.get(answer.question.statement);
+        if (!current) {
+          scoresByQuestion.set(answer.question.statement, {
+            groupOrder,
+            questionOrder,
+            score: answer.selectedOption.score,
+          });
+        } else if (this.shouldCapQuestionAtMaxOption(questionOrder)) {
+          current.score = Math.max(current.score, answer.selectedOption.score);
+        } else {
+          current.score += answer.selectedOption.score;
+        }
       }
+
       if (answer.selectedOption) {
-        rawResponses[answer.question.statement] = answer.selectedOption.label;
+        const key = answer.question.statement;
+        const value = answer.selectedOption.label;
+        const current = rawResponses[key];
+        if (!current) {
+          rawResponses[key] = value;
+        } else {
+          // Quando houver várias opções na mesma pergunta, concatena para preservar contexto.
+          const labels = current.split("; ");
+          if (!labels.includes(value)) {
+            rawResponses[key] = `${current}; ${value}`;
+          }
+        }
       } else if (answer.valueText) {
         rawResponses[answer.question.statement] = answer.valueText;
       }
+    }
+
+    for (const questionScore of scoresByQuestion.values()) {
+      scoresByGroupOrder[questionScore.groupOrder] =
+        (scoresByGroupOrder[questionScore.groupOrder] || 0) +
+        questionScore.score;
     }
 
     for (const [orderStr, cap] of Object.entries(
@@ -1231,20 +1343,51 @@ export class QuestionnaireService {
     answers: Array<{
       selectedOption: { score: number } | null;
       question: {
+        order?: number;
+        id?: string;
         group?: { order: number } | null;
         subGroup?: { group: { order: number } } | null;
       };
     }>,
   ) {
+    const scoresByQuestion = new Map<
+      string,
+      { groupOrder: number; questionOrder: number; score: number }
+    >();
     const scoresByGroupOrder: Record<number, number> = {};
 
     for (const answer of answers) {
       const groupOrder =
         answer.question.group?.order ?? answer.question.subGroup?.group?.order;
+
       if (groupOrder !== undefined && answer.selectedOption) {
-        scoresByGroupOrder[groupOrder] =
-          (scoresByGroupOrder[groupOrder] || 0) + answer.selectedOption.score;
+        const questionOrder = answer.question.order;
+        const questionKey =
+          answer.question.id || `${groupOrder}:${questionOrder || "unknown"}`;
+
+        const current = scoresByQuestion.get(questionKey);
+
+        if (!current) {
+          scoresByQuestion.set(questionKey, {
+            groupOrder,
+            questionOrder: questionOrder || -1,
+            score: answer.selectedOption.score,
+          });
+          continue;
+        }
+
+        if (this.shouldCapQuestionAtMaxOption(questionOrder)) {
+          current.score = Math.max(current.score, answer.selectedOption.score);
+        } else {
+          current.score += answer.selectedOption.score;
+        }
       }
+    }
+
+    for (const questionScore of scoresByQuestion.values()) {
+      scoresByGroupOrder[questionScore.groupOrder] =
+        (scoresByGroupOrder[questionScore.groupOrder] || 0) +
+        questionScore.score;
     }
 
     for (const [orderStr, cap] of Object.entries(
@@ -1279,6 +1422,25 @@ export class QuestionnaireService {
     if (score < 7) return "Robusto" as const;
     if (score < 15) return "Pré-frágil" as const;
     return "Frágil" as const;
+  }
+
+  private normalizeSelectedOptionIds(answer: {
+    selectedOptionId?: string;
+    selectedOptionIds?: string[];
+  }) {
+    // Aceita payload antigo (selectedOptionId) e novo (selectedOptionIds).
+    const ids = [answer.selectedOptionId, ...(answer.selectedOptionIds || [])]
+      .filter((id): id is string => Boolean(id));
+
+    return Array.from(new Set(ids));
+  }
+
+  private shouldCapQuestionAtMaxOption(questionOrder?: number) {
+    if (!questionOrder) {
+      return false;
+    }
+
+    return QuestionnaireService.MULTI_SELECT_QUESTION_ORDERS.has(questionOrder);
   }
 
   private mapGenderToSex(gender: Gender | null) {
