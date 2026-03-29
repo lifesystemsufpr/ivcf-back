@@ -141,8 +141,10 @@ export type FragilityAssessmentRow = {
   answers: Array<{
     valueText: string | null;
     selectedOption: { score: number; label: string } | null;
+    selectedOptions?: Array<{ score: number; label: string }>;
     question: {
       id: string;
+      order?: number;
       statement: string;
       group?: { order: number } | null;
       subGroup?: { group: { order: number } } | null;
