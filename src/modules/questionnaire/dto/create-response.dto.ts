@@ -17,6 +17,11 @@ class AnswerDto {
   @IsOptional()
   selectedOptionId?: string;
 
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  @IsOptional()
+  selectedOptionIds?: string[];
+
   @IsString()
   @IsOptional()
   valueText?: string;
