@@ -558,8 +558,14 @@ export class QuestionnaireService {
         ON q."id" = qr."questionnaireId"
       INNER JOIN "health_professional_participant" AS hpp
         ON hpp."participantId" = qr."participantId"
+      INNER JOIN "participant" AS p
+        ON p."id" = qr."participantId"
+      INNER JOIN "user" AS u
+        ON u."id" = p."id"
       WHERE hpp."healthProfessionalId" = ${healthProfessionalId}
         AND q."slug" = 'ivcf-20'
+        AND p."active" = true
+        AND u."active" = true
         ${query.start
         ? Prisma.sql`AND qr."date" >= ${new Date(query.start)}`
         : Prisma.empty
@@ -578,7 +584,13 @@ export class QuestionnaireService {
     }
 
     const responses = await this.prisma.questionnaireResponse.findMany({
-      where: { id: { in: ids } },
+      where: {
+        id: { in: ids },
+        participant: {
+          active: true,
+          user: { active: true },
+        },
+      },
       include: {
         participant: {
           select: {
@@ -1254,8 +1266,14 @@ export class QuestionnaireService {
           ON q."id" = qr."questionnaireId"
         INNER JOIN "health_professional_participant" AS hpp
           ON hpp."participantId" = qr."participantId"
+        INNER JOIN "participant" AS p
+          ON p."id" = qr."participantId"
+        INNER JOIN "user" AS u
+          ON u."id" = p."id"
         WHERE hpp."healthProfessionalId" = ${healthProfessionalId}
           AND q."slug" = 'ivcf-20'
+          AND p."active" = true
+          AND u."active" = true
           AND qr."createdAt" >= ${start}
           AND qr."createdAt" < ${end}
         GROUP BY 1
@@ -1289,7 +1307,13 @@ export class QuestionnaireService {
     const links = await this.prisma.$queryRaw<{ participantId: string }[]>`
       SELECT hpp."participantId"
       FROM "health_professional_participant" AS hpp
+      INNER JOIN "participant" AS p
+        ON p."id" = hpp."participantId"
+      INNER JOIN "user" AS u
+        ON u."id" = p."id"
       WHERE hpp."healthProfessionalId" = ${healthProfessionalId}
+        AND p."active" = true
+        AND u."active" = true
     `;
 
     const participantIds = links.map((link) => link.participantId);
@@ -1305,6 +1329,10 @@ export class QuestionnaireService {
     const rows = await this.prisma.questionnaireResponse.findMany({
       where: {
         participantId: { in: participantIds },
+        participant: {
+          active: true,
+          user: { active: true },
+        },
         createdAt: {
           gte: start,
           lt: end,
