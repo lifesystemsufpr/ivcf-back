@@ -30,7 +30,7 @@ export class QuestionnaireService {
     {
       age: "Idade",
       selfPerception: "Autopercepção da Saúde",
-      functionalCapacity: "Capacidade Funcional",
+      functionalCapacity: "Atividades da Vida Diária",
       cognition: "Cognição",
       mood: "Humor",
       mobility: "Mobilidade",
