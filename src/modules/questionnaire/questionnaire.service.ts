@@ -63,6 +63,35 @@ export class QuestionnaireService {
   }
 
   async createResponse(dto: CreateResponseDto) {
+    const [participant, healthProfessional, questionnaire] = await Promise.all([
+      this.prisma.participant.findUnique({
+        where: { id: dto.participantId },
+        select: { id: true, active: true },
+      }),
+      this.prisma.healthProfessional.findUnique({
+        where: { id: dto.healthProfessionalId },
+        select: { id: true, active: true },
+      }),
+      this.prisma.questionnaire.findUnique({
+        where: { id: dto.questionnaireId },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!participant || !participant.active) {
+      throw new BadRequestException("Participante inválido ou inativo.");
+    }
+
+    if (!healthProfessional || !healthProfessional.active) {
+      throw new BadRequestException(
+        "Profissional de saúde inválido ou inativo.",
+      );
+    }
+
+    if (!questionnaire) {
+      throw new BadRequestException("Questionário inválido.");
+    }
+
     // Normaliza o payload para um formato único: 1 linha por opção marcada.
     const normalizedAnswers: Array<{
       questionId: string;
