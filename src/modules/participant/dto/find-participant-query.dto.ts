@@ -7,7 +7,7 @@ import {
   IsOptional,
   IsString,
 } from "class-validator";
-import { Scholarship, SocialEconomicLevel } from "@prisma/client";
+import { Gender } from "@prisma/client";
 import { QueryDto } from "src/shared/dto/query.dto";
 
 export enum ParticipantSortField {
@@ -64,12 +64,8 @@ export class FindParticipantQueryDto extends QueryDto {
   email?: string;
 
   @IsOptional()
-  @IsString()
-  gender?: string;
-
-  @IsOptional()
-  @IsString()
-  phone?: string;
+  @IsEnum(Gender)
+  gender?: Gender;
 
   @IsOptional()
   @IsString()
@@ -108,12 +104,4 @@ export class FindParticipantQueryDto extends QueryDto {
   @Type(() => Number)
   @IsInt()
   height?: number;
-
-  @IsOptional()
-  @IsEnum(Scholarship)
-  scholarship?: Scholarship;
-
-  @IsOptional()
-  @IsEnum(SocialEconomicLevel)
-  socio_economic_level?: SocialEconomicLevel;
 }

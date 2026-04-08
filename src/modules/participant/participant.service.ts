@@ -8,15 +8,7 @@ import { CreateParticipantDto } from "./dto/create-participant.dto";
 import { UpdateParticipantDto } from "./dto/update-participant.dto";
 import { PrismaService } from "src/shared/prisma/prisma.service";
 import { UserService } from "../users/user.service";
-import {
-  Participant,
-  Prisma,
-  Scholarship,
-  SocialEconomicLevel,
-  SystemRole,
-  Gender,
-  User,
-} from "@prisma/client";
+import { Participant, Prisma, SystemRole, Gender, User } from "@prisma/client";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { BaseService } from "src/shared/services/base.service";
 import { Payload } from "src/modules/auth/interfaces/auth.interface";
@@ -93,23 +85,13 @@ export class ParticipantService extends BaseService<
       return { ...user, ...participant };
     });
   }
-<<<<<<< Updated upstream
-  async findAll(queryDto: QueryDto, healthProfessionalId: string) {
-    const customWhere = {
-      active: true,
-      user: { active: true },
-      healthProfessionalsLinks: {
-        some: { healthProfessionalId },
-      },
-    };
-=======
+
   async findAll(
     queryDto: FindParticipantQueryDto,
     healthProfessionalId: string,
     rawQuery: Record<string, unknown> = {},
   ) {
     const { page = 1, pageSize = 10, search } = queryDto;
->>>>>>> Stashed changes
 
     const where = this.buildWhereFilters(
       rawQuery,
@@ -211,7 +193,11 @@ export class ParticipantService extends BaseService<
     ]);
 
     const andFilters: Prisma.ParticipantWhereInput[] = [
-      { healthProfessionalId },
+      {
+        healthProfessionalsLinks: {
+          some: { healthProfessionalId },
+        },
+      },
       { user: { active: true } },
       { active: activeFromDto ?? true },
     ];
@@ -253,18 +239,7 @@ export class ParticipantService extends BaseService<
             stringValue,
             Object.values(Gender) as string[],
           );
-          andFilters.push({
-            user: {
-              gender: stringValue as Gender,
-            },
-          });
-          break;
-        case "phone":
-          andFilters.push({
-            user: {
-              phone: { contains: stringValue, mode: "insensitive" },
-            },
-          });
+          andFilters.push({ gender: stringValue as Gender });
           break;
         case "city":
           andFilters.push({
@@ -309,24 +284,6 @@ export class ParticipantService extends BaseService<
         case "height":
           andFilters.push({
             height: this.parseIntegerFilter(key, stringValue),
-          });
-          break;
-        case "scholarship":
-          this.assertEnumFilter(
-            key,
-            stringValue,
-            Object.values(Scholarship) as string[],
-          );
-          andFilters.push({ scholarship: stringValue as Scholarship });
-          break;
-        case "socio_economic_level":
-          this.assertEnumFilter(
-            key,
-            stringValue,
-            Object.values(SocialEconomicLevel) as string[],
-          );
-          andFilters.push({
-            socio_economic_level: stringValue as SocialEconomicLevel,
           });
           break;
         case "birthday": {
@@ -607,7 +564,9 @@ export class ParticipantService extends BaseService<
     return await this.prisma.checkDeletionSafety("Participant", id);
   }
 
-  async checkEmail(email: string) {
+  async checkEmail(
+    email: string,
+  ): Promise<{ userId: string; participantId: string | undefined }> {
     const user = await this.prisma.user.findUnique({
       where: { email },
       select: {

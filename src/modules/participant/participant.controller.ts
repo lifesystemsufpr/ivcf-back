@@ -16,11 +16,9 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { SystemRole } from "@prisma/client";
 import { RequestUser } from "../auth/decorators/request-user.decorator";
 import { Payload } from "../auth/interfaces/auth.interface";
-<<<<<<< Updated upstream
-
-=======
 import { FindParticipantQueryDto } from "./dto/find-participant-query.dto";
->>>>>>> Stashed changes
+
+@ApiBearerAuth()
 @Controller("participant")
 export class ParticipantController {
   constructor(private readonly participantService: ParticipantService) {}
@@ -70,7 +68,16 @@ export class ParticipantController {
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Get("check-email/:email")
-  checkEmail(@RequestUser() user: Payload, @Param("email") email: string) {
-    return this.participantService.checkEmail(email);
+  checkEmail(
+    @RequestUser() _user: Payload,
+    @Param("email") email: string,
+  ): Promise<{ userId: string; participantId: string | undefined }> {
+    const participantService: {
+      checkEmail: (
+        value: string,
+      ) => Promise<{ userId: string; participantId: string | undefined }>;
+    } = this.participantService;
+
+    return participantService.checkEmail(email);
   }
 }
