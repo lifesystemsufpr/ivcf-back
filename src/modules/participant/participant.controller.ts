@@ -14,10 +14,13 @@ import { UpdateParticipantDto } from "./dto/update-participant.dto";
 import { ApiBearerAuth, ApiNoContentResponse } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { SystemRole } from "@prisma/client";
-import { QueryDto } from "src/shared/dto/query.dto";
 import { RequestUser } from "../auth/decorators/request-user.decorator";
 import { Payload } from "../auth/interfaces/auth.interface";
+<<<<<<< Updated upstream
 
+=======
+import { FindParticipantQueryDto } from "./dto/find-participant-query.dto";
+>>>>>>> Stashed changes
 @Controller("participant")
 export class ParticipantController {
   constructor(private readonly participantService: ParticipantService) {}
@@ -33,8 +36,12 @@ export class ParticipantController {
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Get()
-  findAll(@RequestUser() user: Payload, @Query() queryDto: QueryDto) {
-    return this.participantService.findAll(queryDto, user.id);
+  findAll(
+    @RequestUser() user: Payload,
+    @Query() queryDto: FindParticipantQueryDto,
+    @Query() rawQuery: Record<string, unknown>,
+  ) {
+    return this.participantService.findAll(queryDto, user.id, rawQuery);
   }
 
   @Roles([SystemRole.PARTICIPANT, SystemRole.HEALTH_PROFESSIONAL])

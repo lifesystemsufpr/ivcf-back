@@ -8,11 +8,24 @@ import { CreateParticipantDto } from "./dto/create-participant.dto";
 import { UpdateParticipantDto } from "./dto/update-participant.dto";
 import { PrismaService } from "src/shared/prisma/prisma.service";
 import { UserService } from "../users/user.service";
-import { Participant, Prisma, SystemRole, User } from "@prisma/client";
+import {
+  Participant,
+  Prisma,
+  Scholarship,
+  SocialEconomicLevel,
+  SystemRole,
+  Gender,
+  User,
+} from "@prisma/client";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { BaseService } from "src/shared/services/base.service";
-import { QueryDto } from "src/shared/dto/query.dto";
 import { Payload } from "src/modules/auth/interfaces/auth.interface";
+import {
+  FindParticipantQueryDto,
+  ParticipantSortField,
+  SortDirection,
+} from "./dto/find-participant-query.dto";
+import { normalizeString } from "src/shared/functions/normalize-string";
 
 type ParticipantWithUser = Participant & { user: User };
 export type ParticipantResponse = Omit<ParticipantWithUser, "user"> &
@@ -80,6 +93,7 @@ export class ParticipantService extends BaseService<
       return { ...user, ...participant };
     });
   }
+<<<<<<< Updated upstream
   async findAll(queryDto: QueryDto, healthProfessionalId: string) {
     const customWhere = {
       active: true,
@@ -88,13 +102,40 @@ export class ParticipantService extends BaseService<
         some: { healthProfessionalId },
       },
     };
+=======
+  async findAll(
+    queryDto: FindParticipantQueryDto,
+    healthProfessionalId: string,
+    rawQuery: Record<string, unknown> = {},
+  ) {
+    const { page = 1, pageSize = 10, search } = queryDto;
+>>>>>>> Stashed changes
 
-    console.time("findAll-prisma-query");
-    const result = await super.findAll(queryDto, customWhere);
-    console.timeEnd("findAll-prisma-query");
+    const where = this.buildWhereFilters(
+      rawQuery,
+      healthProfessionalId,
+      queryDto.active,
+      search,
+    );
+    const orderBy = this.buildOrderBy(queryDto);
+
+    const [participants, total] = await this.prisma.$transaction([
+      this.prisma.participant.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: { user: true },
+        ...(orderBy ? { orderBy } : {}),
+      }),
+      this.prisma.participant.count({ where }),
+    ]);
+
+    const transformedData = participants.map((participant) =>
+      this.transform(participant),
+    );
 
     const dataWithRelations = await Promise.all(
-      result.data.map(async (participant, index) => {
+      transformedData.map(async (participant) => {
         try {
           const safetyInfo = await this.checkDeletability(participant.id);
 
@@ -114,9 +155,288 @@ export class ParticipantService extends BaseService<
     );
 
     return {
-      ...result,
       data: dataWithRelations,
+      meta: {
+        total,
+        page,
+        pageSize,
+        lastPage: Math.ceil(total / pageSize),
+      },
     };
+  }
+
+  private buildOrderBy(
+    queryDto: FindParticipantQueryDto,
+  ): Prisma.ParticipantOrderByWithRelationInput | undefined {
+    const { sortField, sortDirection = SortDirection.ASC } = queryDto;
+
+    if (!sortField) {
+      return undefined;
+    }
+
+    switch (sortField) {
+      case ParticipantSortField.FULL_NAME:
+        return { user: { fullName: sortDirection } };
+      case ParticipantSortField.EMAIL:
+        return { user: { email: sortDirection } };
+      case ParticipantSortField.CITY:
+        return { city: sortDirection };
+      case ParticipantSortField.STATE:
+        return { state: sortDirection };
+      case ParticipantSortField.NEIGHBORHOOD:
+        return { neighborhood: sortDirection };
+      case ParticipantSortField.BIRTHDAY:
+        return { birthday: sortDirection };
+      case ParticipantSortField.CREATED_AT:
+        return { createdAt: sortDirection };
+      case ParticipantSortField.UPDATED_AT:
+        return { updatedAt: sortDirection };
+      default:
+        return undefined;
+    }
+  }
+
+  private buildWhereFilters(
+    rawQuery: Record<string, unknown>,
+    healthProfessionalId: string,
+    activeFromDto?: boolean,
+    search?: string,
+  ): Prisma.ParticipantWhereInput {
+    const reservedParams = new Set([
+      "page",
+      "pageSize",
+      "search",
+      "sortField",
+      "sortDirection",
+    ]);
+
+    const andFilters: Prisma.ParticipantWhereInput[] = [
+      { healthProfessionalId },
+      { user: { active: true } },
+      { active: activeFromDto ?? true },
+    ];
+
+    for (const [key, value] of Object.entries(rawQuery)) {
+      if (reservedParams.has(key) || value === undefined || value === null) {
+        continue;
+      }
+
+      const stringValue = String(value).trim();
+      if (!stringValue) {
+        continue;
+      }
+
+      switch (key) {
+        case "id":
+          andFilters.push({ id: stringValue });
+          break;
+        case "fullName":
+          andFilters.push({
+            user: {
+              fullName_normalized: {
+                contains: normalizeString(stringValue) || "",
+                mode: "insensitive",
+              },
+            },
+          });
+          break;
+        case "email":
+          andFilters.push({
+            user: {
+              email: { contains: stringValue, mode: "insensitive" },
+            },
+          });
+          break;
+        case "gender":
+          this.assertEnumFilter(
+            key,
+            stringValue,
+            Object.values(Gender) as string[],
+          );
+          andFilters.push({
+            user: {
+              gender: stringValue as Gender,
+            },
+          });
+          break;
+        case "phone":
+          andFilters.push({
+            user: {
+              phone: { contains: stringValue, mode: "insensitive" },
+            },
+          });
+          break;
+        case "city":
+          andFilters.push({
+            city: { contains: stringValue, mode: "insensitive" },
+          });
+          break;
+        case "state":
+          andFilters.push({
+            state: { contains: stringValue, mode: "insensitive" },
+          });
+          break;
+        case "neighborhood":
+          andFilters.push({
+            neighborhood: { contains: stringValue, mode: "insensitive" },
+          });
+          break;
+        case "zipCode":
+          andFilters.push({
+            zipCode: { contains: stringValue, mode: "insensitive" },
+          });
+          break;
+        case "street":
+          andFilters.push({
+            street: { contains: stringValue, mode: "insensitive" },
+          });
+          break;
+        case "number":
+          andFilters.push({
+            number: { contains: stringValue, mode: "insensitive" },
+          });
+          break;
+        case "complement":
+          andFilters.push({
+            complement: { contains: stringValue, mode: "insensitive" },
+          });
+          break;
+        case "weight":
+          andFilters.push({
+            weight: this.parseIntegerFilter(key, stringValue),
+          });
+          break;
+        case "height":
+          andFilters.push({
+            height: this.parseIntegerFilter(key, stringValue),
+          });
+          break;
+        case "scholarship":
+          this.assertEnumFilter(
+            key,
+            stringValue,
+            Object.values(Scholarship) as string[],
+          );
+          andFilters.push({ scholarship: stringValue as Scholarship });
+          break;
+        case "socio_economic_level":
+          this.assertEnumFilter(
+            key,
+            stringValue,
+            Object.values(SocialEconomicLevel) as string[],
+          );
+          andFilters.push({
+            socio_economic_level: stringValue as SocialEconomicLevel,
+          });
+          break;
+        case "birthday": {
+          const { gte, lt } = this.parseDateRangeFilter(key, stringValue);
+          andFilters.push({ birthday: { gte, lt } });
+          break;
+        }
+        case "createdAt": {
+          const { gte, lt } = this.parseDateRangeFilter(key, stringValue);
+          andFilters.push({ createdAt: { gte, lt } });
+          break;
+        }
+        case "updatedAt": {
+          const { gte, lt } = this.parseDateRangeFilter(key, stringValue);
+          andFilters.push({ updatedAt: { gte, lt } });
+          break;
+        }
+        case "active":
+          andFilters.push({
+            active: this.parseBooleanFilter(key, stringValue),
+          });
+          break;
+        default:
+          break;
+      }
+    }
+
+    if (search && search.trim()) {
+      const normalizedSearch = normalizeString(search) || "";
+      andFilters.push({
+        OR: [
+          {
+            user: {
+              fullName_normalized: {
+                contains: normalizedSearch,
+                mode: "insensitive",
+              },
+            },
+          },
+          {
+            user: {
+              email: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    return {
+      AND: andFilters,
+    };
+  }
+
+  private parseIntegerFilter(field: string, value: string): number {
+    if (!/^-?\d+$/.test(value)) {
+      throw new BadRequestException(
+        `O filtro '${field}' deve ser um número inteiro válido.`,
+      );
+    }
+
+    return Number(value);
+  }
+
+  private parseBooleanFilter(field: string, value: string): boolean {
+    if (value === "true") {
+      return true;
+    }
+
+    if (value === "false") {
+      return false;
+    }
+
+    throw new BadRequestException(
+      `O filtro '${field}' deve ser 'true' ou 'false'.`,
+    );
+  }
+
+  private parseDateRangeFilter(
+    field: string,
+    value: string,
+  ): { gte: Date; lt: Date } {
+    const parsedDate = new Date(value);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException(
+        `O filtro '${field}' deve ser uma data válida.`,
+      );
+    }
+
+    const startOfDay = new Date(parsedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const nextDay = new Date(startOfDay);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    return { gte: startOfDay, lt: nextDay };
+  }
+
+  private assertEnumFilter(
+    field: string,
+    value: string,
+    enumValues: string[],
+  ): void {
+    if (!enumValues.includes(value)) {
+      throw new BadRequestException(
+        `O filtro '${field}' possui valor inválido.`,
+      );
+    }
   }
 
   async findOne(
