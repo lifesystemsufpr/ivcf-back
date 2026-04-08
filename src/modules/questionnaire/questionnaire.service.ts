@@ -217,6 +217,20 @@ export class QuestionnaireService {
       classification = "Frágil";
     }
 
+    await this.prisma.healthProfessionalParticipant.upsert({
+      where: {
+        healthProfessionalId_participantId: {
+          healthProfessionalId: dto.healthProfessionalId,
+          participantId: dto.participantId,
+        },
+      },
+      update: {},
+      create: {
+        healthProfessionalId: dto.healthProfessionalId,
+        participantId: dto.participantId,
+      },
+    });
+
     return await this.prisma.questionnaireResponse.create({
       data: {
         participantId: dto.participantId,
