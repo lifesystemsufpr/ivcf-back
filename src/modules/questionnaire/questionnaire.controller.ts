@@ -40,10 +40,13 @@ export class QuestionnaireController {
     return this.service.findAll(query, user.id);
   }
 
-  // TODO: Adicionar roles e registrar healthProfessional basedo no token
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Post("response")
-  create(@Body() dto: CreateResponseDto) {
-    return this.service.createResponse(dto);
+  create(@RequestUser() user: Payload, @Body() dto: CreateResponseDto) {
+    return this.service.createResponse({
+      ...dto,
+      healthProfessionalId: user.id,
+    });
   }
 
   @Get("participant/:participantId")

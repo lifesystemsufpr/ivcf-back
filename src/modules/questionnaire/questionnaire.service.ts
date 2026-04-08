@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { CreateResponseDto } from "./dto/create-response.dto";
 import { PrismaService } from "src/shared/prisma/prisma.service";
 import { FilterQuestionnaireResponseDto } from "./dto/filter-questionnaire-response.dto";
@@ -26,7 +30,7 @@ export class QuestionnaireService {
     {
       age: "Idade",
       selfPerception: "Autopercepção da Saúde",
-      functionalCapacity: "Capacidade Funcional",
+      functionalCapacity: "Atividades da Vida Diária",
       cognition: "Cognição",
       mood: "Humor",
       mobility: "Mobilidade",
@@ -63,6 +67,35 @@ export class QuestionnaireService {
   }
 
   async createResponse(dto: CreateResponseDto) {
+    const [participant, healthProfessional, questionnaire] = await Promise.all([
+      this.prisma.participant.findUnique({
+        where: { id: dto.participantId },
+        select: { id: true, active: true },
+      }),
+      this.prisma.healthProfessional.findUnique({
+        where: { id: dto.healthProfessionalId },
+        select: { id: true, active: true },
+      }),
+      this.prisma.questionnaire.findUnique({
+        where: { id: dto.questionnaireId },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!participant || !participant.active) {
+      throw new BadRequestException("Participante inválido ou inativo.");
+    }
+
+    if (!healthProfessional || !healthProfessional.active) {
+      throw new BadRequestException(
+        "Profissional de saúde inválido ou inativo.",
+      );
+    }
+
+    if (!questionnaire) {
+      throw new BadRequestException("Questionário inválido.");
+    }
+
     // Normaliza o payload para um formato único: 1 linha por opção marcada.
     const normalizedAnswers: Array<{
       questionId: string;
@@ -187,6 +220,20 @@ export class QuestionnaireService {
     } else if (finalScore >= 15) {
       classification = "Frágil";
     }
+
+    await this.prisma.healthProfessionalParticipant.upsert({
+      where: {
+        healthProfessionalId_participantId: {
+          healthProfessionalId: dto.healthProfessionalId,
+          participantId: dto.participantId,
+        },
+      },
+      update: {},
+      create: {
+        healthProfessionalId: dto.healthProfessionalId,
+        participantId: dto.participantId,
+      },
+    });
 
     return await this.prisma.questionnaireResponse.create({
       data: {
@@ -518,17 +565,19 @@ export class QuestionnaireService {
     query: FragilityDashboardQueryDto,
   ): Promise<FragilityDashboardResponse> {
     const stratification = query.stratification || "ageGroup";
-    const { assessments, hadResponses } = await this.getFragilityAssessments(
+    const linkedParticipants = await this.getLinkedParticipants(
       healthProfessionalId,
       query,
     );
-
-    if (assessments.length === 0 && !hadResponses) {
-      return this.buildEmptyDashboard();
-    }
+    const assessments = await this.getFragilityAssessments(
+      healthProfessionalId,
+      query,
+      linkedParticipants.map((participant) => participant.id),
+    );
 
     return await this.buildDashboardFromAssessments(
       assessments,
+      linkedParticipants,
       stratification,
       healthProfessionalId,
     );
@@ -538,31 +587,83 @@ export class QuestionnaireService {
     healthProfessionalId: string,
     query: FragilityDashboardQueryDto,
   ) {
-    const { assessments } = await this.getFragilityAssessments(
+    const linkedParticipants = await this.getLinkedParticipants(
       healthProfessionalId,
       query,
+    );
+    const assessments = await this.getFragilityAssessments(
+      healthProfessionalId,
+      query,
+      linkedParticipants.map((participant) => participant.id),
     );
 
     return this.buildFragilityCsv(assessments);
   }
 
+  private async getLinkedParticipants(
+    healthProfessionalId: string,
+    query: FragilityDashboardQueryDto,
+  ) {
+    const genderFilter = query.sex && query.sex !== "all"
+      ? query.sex === "M"
+        ? Gender.MALE
+        : Gender.FEMALE
+      : undefined;
+
+    const linkedParticipants = await this.prisma.participant.findMany({
+      where: {
+        active: true,
+        user: { active: true },
+        healthProfessionalsLinks: {
+          some: { healthProfessionalId },
+        },
+        ...(genderFilter ? { gender: genderFilter } : {}),
+      },
+      select: {
+        id: true,
+        birthday: true,
+        gender: true,
+      },
+    });
+
+    return linkedParticipants.filter((participant) => {
+      const age = this.getAge(participant.birthday);
+      if (query.ageMin !== undefined && age < query.ageMin) {
+        return false;
+      }
+      if (query.ageMax !== undefined && age > query.ageMax) {
+        return false;
+      }
+      return true;
+    });
+  }
+
   private async getFragilityAssessments(
     healthProfessionalId: string,
     query: FragilityDashboardQueryDto,
-  ): Promise<{ assessments: FragilityAssessmentRow[]; hadResponses: boolean }> {
+    participantIds: string[],
+  ): Promise<FragilityAssessmentRow[]> {
+    if (participantIds.length === 0) {
+      return [];
+    }
+
+    const endDate = query.end ? new Date(query.end) : undefined;
+    if (endDate) {
+      endDate.setUTCHours(23, 59, 59, 999);
+    }
+
     const responseIds = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT DISTINCT ON (qr."participantId")
         qr."id"
       FROM "questionnaire_response" AS qr
       INNER JOIN "questionnaire" AS q
         ON q."id" = qr."questionnaireId"
-      INNER JOIN "health_professional_participant" AS hpp
-        ON hpp."participantId" = qr."participantId"
       INNER JOIN "participant" AS p
         ON p."id" = qr."participantId"
       INNER JOIN "user" AS u
         ON u."id" = p."id"
-      WHERE hpp."healthProfessionalId" = ${healthProfessionalId}
+      WHERE qr."healthProfessionalId" = ${healthProfessionalId}
+        AND qr."participantId" IN (${Prisma.join(participantIds)})
         AND q."slug" = 'ivcf-20'
         AND p."active" = true
         AND u."active" = true
@@ -570,8 +671,8 @@ export class QuestionnaireService {
         ? Prisma.sql`AND qr."date" >= ${new Date(query.start)}`
         : Prisma.empty
       }
-        ${query.end
-        ? Prisma.sql`AND qr."date" <= ${new Date(query.end)}`
+        ${endDate
+        ? Prisma.sql`AND qr."date" <= ${endDate}`
         : Prisma.empty
       }
       ORDER BY qr."participantId", qr."createdAt" DESC
@@ -580,12 +681,13 @@ export class QuestionnaireService {
     const ids = responseIds.map((row) => row.id);
 
     if (ids.length === 0) {
-      return { assessments: [], hadResponses: false };
+      return [];
     }
 
     const responses = await this.prisma.questionnaireResponse.findMany({
       where: {
         id: { in: ids },
+        healthProfessionalId,
         participant: {
           active: true,
           user: { active: true },
@@ -663,7 +765,7 @@ export class QuestionnaireService {
         return true;
       });
 
-    return { assessments, hadResponses: true };
+    return assessments;
   }
 
   private buildFragilityCsv(assessments: FragilityAssessmentRow[]) {
@@ -876,10 +978,15 @@ export class QuestionnaireService {
   private buildEmptyDashboard() {
     return {
       summary: {
-        total: 0,
+        totalParticipants: 0,
+        totalEvaluated: 0,
         avgScore: 0,
         avgAge: 0,
-        topAgeGroups: [],
+        topAgeGroups: [
+          { label: "60-74", value: 0 },
+          { label: "75-84", value: 0 },
+          { label: "85+", value: 0 },
+        ],
       },
       charts: {
         riskBar: [],
@@ -914,38 +1021,28 @@ export class QuestionnaireService {
         };
       }>;
     }>,
+    linkedParticipants: Array<{
+      id: string;
+      birthday: Date;
+      gender: Gender;
+    }>,
     stratification: "sex" | "ageGroup",
     healthProfessionalId: string,
   ) {
-    if (assessments.length === 0) {
-      const trend = await this.buildMonthlyTrend(healthProfessionalId);
-      return {
-        summary: {
-          total: 0,
-          avgScore: 0,
-          avgAge: 0,
-          topAgeGroups: [],
-        },
-        charts: {
-          riskBar: [],
-          heatmap: [],
-          riskPyramid: [],
-          scatter: [],
-          trend,
-          domainDrilldown: [],
-        },
-        metadata: {
-          ageBounds: { min: 0, max: 0 },
-        },
-      };
-    }
+    const participantsWithAge = linkedParticipants.map((participant) => ({
+      ...participant,
+      age: this.getAge(participant.birthday),
+    }));
 
-    const total = assessments.length;
+    const totalParticipants = participantsWithAge.length;
+    const totalEvaluated = assessments.length;
     const totalScore = assessments.reduce((sum, a) => sum + a.score, 0);
-    const totalAge = assessments.reduce((sum, a) => sum + a.age, 0);
 
-    const avgScore = total > 0 ? totalScore / total : 0;
-    const avgAge = total > 0 ? totalAge / total : 0;
+    const avgScore = totalEvaluated > 0 ? totalScore / totalEvaluated : 0;
+    const avgAge = totalParticipants > 0
+      ? participantsWithAge.reduce((sum, participant) => sum + participant.age, 0) /
+        totalParticipants
+      : 0;
 
     const ageGroups = {
       "60-74": 0,
@@ -953,24 +1050,59 @@ export class QuestionnaireService {
       "85+": 0,
     };
 
-    const minAge = assessments.reduce(
-      (min, a) => (a.age < min ? a.age : min),
-      assessments[0]?.age ?? 0,
+    const minAge = participantsWithAge.reduce(
+      (min, participant) => (participant.age < min ? participant.age : min),
+      participantsWithAge[0]?.age ?? 0,
     );
 
-    const maxAge = assessments.reduce(
-      (max, a) => (a.age > max ? a.age : max),
-      assessments[0]?.age ?? 0,
+    const maxAge = participantsWithAge.reduce(
+      (max, participant) => (participant.age > max ? participant.age : max),
+      participantsWithAge[0]?.age ?? 0,
     );
 
-    for (const assessment of assessments) {
-      if (assessment.age <= 74) {
+    for (const participant of participantsWithAge) {
+      if (participant.age < 60) {
+        continue;
+      }
+
+      if (participant.age <= 74) {
         ageGroups["60-74"]++;
-      } else if (assessment.age <= 84) {
+      } else if (participant.age <= 84) {
         ageGroups["75-84"]++;
       } else {
         ageGroups["85+"]++;
       }
+    }
+
+    const trend = await this.buildMonthlyTrend(
+      healthProfessionalId,
+      linkedParticipants.map((participant) => participant.id),
+    );
+
+    if (totalEvaluated === 0) {
+      return {
+        summary: {
+          totalParticipants,
+          totalEvaluated,
+          avgScore: 0,
+          avgAge: Number(avgAge.toFixed(1)),
+          topAgeGroups: Object.entries(ageGroups).map(([label, value]) => ({
+            label,
+            value,
+          })),
+        },
+        charts: {
+          riskBar: [],
+          heatmap: [],
+          riskPyramid: [],
+          scatter: [],
+          trend,
+          domainDrilldown: this.buildDomainDrilldown([]),
+        },
+        metadata: {
+          ageBounds: { min: minAge, max: maxAge },
+        },
+      };
     }
 
     const riskCounts = {
@@ -989,7 +1121,7 @@ export class QuestionnaireService {
       }
     }
 
-    const riskBar = total
+    const riskBar = totalEvaluated
       ? [
         {
           category: "Robusto",
@@ -1048,13 +1180,10 @@ export class QuestionnaireService {
         data: groups.map((group) => {
           const groupAssessments = assessments.filter((assessment) => {
             if (stratification === "ageGroup") {
-              if (group === "60-74") {
-                return assessment.age <= 74;
-              }
-              if (group === "75-84") {
-                return assessment.age > 74 && assessment.age <= 84;
-              }
-              return assessment.age > 84;
+              return this.isInElderlyAgeGroup(
+                assessment.age,
+                group as "60-74" | "75-84" | "85+",
+              );
             }
             return group === "Masculino"
               ? assessment.sex === "M"
@@ -1078,13 +1207,10 @@ export class QuestionnaireService {
         ? ["60-74", "75-84", "85+"]
           .map((group) => {
             const groupAssessments = assessments.filter((assessment) => {
-              if (group === "60-74") {
-                return assessment.age <= 74;
-              }
-              if (group === "75-84") {
-                return assessment.age > 74 && assessment.age <= 84;
-              }
-              return assessment.age > 84;
+              return this.isInElderlyAgeGroup(
+                assessment.age,
+                group as "60-74" | "75-84" | "85+",
+              );
             });
 
             return {
@@ -1123,11 +1249,10 @@ export class QuestionnaireService {
 
     const domainDrilldown = this.buildDomainDrilldown(assessments);
 
-    const trend = await this.buildMonthlyTrend(healthProfessionalId);
-
     return {
       summary: {
-        total,
+        totalParticipants,
+        totalEvaluated,
         avgScore: Number(avgScore.toFixed(1)),
         avgAge: Number(avgAge.toFixed(1)),
         topAgeGroups: Object.entries(ageGroups).map(([label, value]) => ({
@@ -1152,7 +1277,7 @@ export class QuestionnaireService {
   private buildDomainDrilldown(
     assessments: Array<{
       answers: Array<{
-        selectedOption: { label: string } | null;
+        selectedOption: { score: number; label: string } | null;
         question: {
           id: string;
           statement: string;
@@ -1170,23 +1295,50 @@ export class QuestionnaireService {
         counts: { sim: number; nao: number };
         children: Map<
           string,
-          { id: string; label: string; counts: { sim: number; nao: number } }
+          {
+            id: string;
+            label: string;
+            counts: { sim: number; nao: number };
+            responses: Map<
+              string,
+              {
+                label: string;
+                count: number;
+                score: number;
+                indicatesFragility: boolean;
+              }
+            >;
+          }
         >;
       }
     >();
 
+    for (const [domainKey, label] of Object.entries(
+      QuestionnaireService.DOMAIN_LABELS,
+    ) as Array<[keyof IvcfDomainScores, string]>) {
+      domainMap.set(domainKey, {
+        id: domainKey,
+        label,
+        counts: { sim: 0, nao: 0 },
+        children: new Map(),
+      });
+    }
+
     for (const assessment of assessments) {
       for (const answer of assessment.answers) {
-        if (!answer.selectedOption?.label) {
+        if (!answer.selectedOption) {
           continue;
         }
 
         const normalizedLabel =
           normalizeString(answer.selectedOption.label)?.toLowerCase() || "";
-        const isYes = normalizedLabel === "sim";
-        const isNo = normalizedLabel === "nao";
+        const isYes =
+          answer.selectedOption.score > 0 || normalizedLabel === "sim";
+        const isNo =
+          answer.selectedOption.score === 0 || normalizedLabel === "nao";
+        const indicatesFragility = isYes ? true : isNo ? false : null;
 
-        if (!isYes && !isNo) {
+        if (indicatesFragility === null) {
           continue;
         }
 
@@ -1202,15 +1354,6 @@ export class QuestionnaireService {
           continue;
         }
 
-        if (!domainMap.has(domainKey)) {
-          domainMap.set(domainKey, {
-            id: domainKey,
-            label: QuestionnaireService.DOMAIN_LABELS[domainKey],
-            counts: { sim: 0, nao: 0 },
-            children: new Map(),
-          });
-        }
-
         const domainNode = domainMap.get(domainKey);
         if (!domainNode) {
           continue;
@@ -1221,12 +1364,29 @@ export class QuestionnaireService {
             id: answer.question.id,
             label: answer.question.statement,
             counts: { sim: 0, nao: 0 },
+            responses: new Map(),
           });
         }
 
         const questionNode = domainNode.children.get(answer.question.id);
         if (!questionNode) {
           continue;
+        }
+
+        const responseKey =
+          `${answer.selectedOption.label}::${answer.selectedOption.score}`;
+        if (!questionNode.responses.has(responseKey)) {
+          questionNode.responses.set(responseKey, {
+            label: answer.selectedOption.label,
+            count: 0,
+            score: answer.selectedOption.score,
+            indicatesFragility,
+          });
+        }
+
+        const responseNode = questionNode.responses.get(responseKey);
+        if (responseNode) {
+          responseNode.count += 1;
         }
 
         if (isYes) {
@@ -1243,11 +1403,25 @@ export class QuestionnaireService {
       id: domain.id,
       label: domain.label,
       counts: domain.counts,
-      children: Array.from(domain.children.values()),
+      children: Array.from(domain.children.values()).map((question) => ({
+        id: question.id,
+        label: question.label,
+        counts: question.counts,
+        responses: Array.from(question.responses.values()).sort((a, b) => {
+          if (b.count !== a.count) {
+            return b.count - a.count;
+          }
+
+          return a.label.localeCompare(b.label);
+        }),
+      })),
     }));
   }
 
-  private async buildMonthlyTrend(healthProfessionalId: string) {
+  private async buildMonthlyTrend(
+    healthProfessionalId: string,
+    participantIds: string[],
+  ) {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -1257,6 +1431,23 @@ export class QuestionnaireService {
       return `${date.getFullYear()}-${month}`;
     };
 
+    const buildEmptyTrend = () => {
+      const data = Array.from({ length: 12 }).map((_, index) => {
+        const date = new Date(start.getFullYear(), start.getMonth() + index, 1);
+        const key = monthKey(date);
+        return {
+          x: `${key}-01`,
+          y: 0,
+        };
+      });
+
+      return [{ id: "Cohort", data }];
+    };
+
+    if (participantIds.length === 0) {
+      return buildEmptyTrend();
+    }
+
     return this.prisma
       .$queryRaw<{ month: Date; total: number }[]>`
         SELECT date_trunc('month', qr."createdAt") AS month,
@@ -1264,13 +1455,12 @@ export class QuestionnaireService {
         FROM "questionnaire_response" AS qr
         INNER JOIN "questionnaire" AS q
           ON q."id" = qr."questionnaireId"
-        INNER JOIN "health_professional_participant" AS hpp
-          ON hpp."participantId" = qr."participantId"
         INNER JOIN "participant" AS p
           ON p."id" = qr."participantId"
         INNER JOIN "user" AS u
           ON u."id" = p."id"
-        WHERE hpp."healthProfessionalId" = ${healthProfessionalId}
+        WHERE qr."healthProfessionalId" = ${healthProfessionalId}
+          AND qr."participantId" IN (${Prisma.join(participantIds)})
           AND q."slug" = 'ivcf-20'
           AND p."active" = true
           AND u."active" = true
@@ -1329,6 +1519,7 @@ export class QuestionnaireService {
     const rows = await this.prisma.questionnaireResponse.findMany({
       where: {
         participantId: { in: participantIds },
+        healthProfessionalId,
         participant: {
           active: true,
           user: { active: true },
@@ -1479,6 +1670,21 @@ export class QuestionnaireService {
       return "F" as const;
     }
     return null;
+  }
+
+  private isInElderlyAgeGroup(
+    age: number,
+    group: "60-74" | "75-84" | "85+",
+  ) {
+    if (group === "60-74") {
+      return age >= 60 && age <= 74;
+    }
+
+    if (group === "75-84") {
+      return age >= 75 && age <= 84;
+    }
+
+    return age >= 85;
   }
 
   private getAge(birthday: Date) {

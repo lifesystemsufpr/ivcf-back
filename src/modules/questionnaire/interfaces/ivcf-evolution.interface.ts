@@ -79,7 +79,8 @@ export interface AssessmentDetailResponse {
 
 export interface FragilityDashboardResponse {
   summary: {
-    total: number;
+    totalParticipants: number;
+    totalEvaluated: number;
     avgScore: number;
     avgAge: number;
     topAgeGroups: Array<{ label: string; value: number }>;
@@ -113,6 +114,12 @@ export interface FragilityDashboardResponse {
         id: string;
         label: string;
         counts: { sim: number; nao: number };
+        responses: Array<{
+          label: string;
+          count: number;
+          score: number;
+          indicatesFragility: boolean;
+        }>;
       }>;
     }>;
   };
