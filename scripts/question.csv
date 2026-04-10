@@ -1,0 +1,21 @@
+"id","statement","order","type","required","groupId","subGroupId"
+"0a2a1ec9-d61f-461e-b2a2-867d20c436f0",Qual é a sua idade?,1,MULTIPLE_CHOICE,true,"9cf24f6b-b20c-4970-8496-4ac7bf2be3c5",
+"8628ef66-b7a7-4158-91fb-57bc53fda774","Em geral, comparando com outras pessoas de sua idade, você diria que sua saúde é:",2,MULTIPLE_CHOICE,true,"59e283a9-17ac-46b0-9d15-3a4cfb2f6f96",
+"061e9753-ebc1-45e1-a078-d4c66197b226","Por causa de sua saúde ou condição física, você deixou de fazer compras?",3,MULTIPLE_CHOICE,true,"1b636fe0-5524-47dd-9f93-4836fa309bd0",
+"2ab20311-3d0c-4feb-b2fe-8a8eb298629b","Por causa de sua saúde ou condição física, você deixou de controlar seu dinheiro?",4,MULTIPLE_CHOICE,true,"1b636fe0-5524-47dd-9f93-4836fa309bd0",
+"8c5ed73d-94be-47bd-9866-68530ce91658","Por causa de sua saúde ou condição física, você deixou de realizar pequenos trabalhos domésticos?",5,MULTIPLE_CHOICE,true,"1b636fe0-5524-47dd-9f93-4836fa309bd0",
+b19d6f79-27f2-44bc-bcd8-2c2e3cd748ba,"Por causa de sua saúde ou condição física, você deixou de tomar banho sozinho?",6,MULTIPLE_CHOICE,true,fb695c8f-f8b2-45ed-8d6a-4857ac4c41c9,
+ad863e3a-ec62-4d26-9546-93205680c2cd,Algum familiar ou amigo falou que você está ficando esquecido?,7,MULTIPLE_CHOICE,true,"69f32261-35ca-4315-9695-d2a1114bdd1c",
+"7ede63de-2107-4fa5-93f6-7b346fd64a14",Este esquecimento está piorando nos últimos meses?,8,MULTIPLE_CHOICE,true,"69f32261-35ca-4315-9695-d2a1114bdd1c",
+"155992a9-f0b9-4ebe-872d-3238734e5707",Este esquecimento está impedindo a realização de alguma atividade do cotidiano?,9,MULTIPLE_CHOICE,true,"69f32261-35ca-4315-9695-d2a1114bdd1c",
+"25578200-772d-4476-8f6c-6d5985314517","No último mês, você ficou com desânimo, tristeza ou desesperança?",10,MULTIPLE_CHOICE,true,e68fa855-6ad8-41ed-b199-5060c698be44,
+b87e2313-ea60-4491-8923-1a9a2a54c809,"No último mês, você perdeu o interesse ou prazer em atividades anteriormente prazerosas?",11,MULTIPLE_CHOICE,true,e68fa855-6ad8-41ed-b199-5060c698be44,
+"2b3f66fc-e948-4dd7-829e-af226d24e54e",Você é incapaz de elevar os braços acima do nível do ombro?,12,MULTIPLE_CHOICE,true,,de1dfb9d-5c14-4a14-b63d-572c74fc9e73
+"9ada972f-ecef-4fa0-aaee-71fe303d8617",Você é incapaz de manusear ou segurar pequenos objetos?,13,MULTIPLE_CHOICE,true,,de1dfb9d-5c14-4a14-b63d-572c74fc9e73
+"44b25653-f279-4064-9e11-2fd1171eaa72","Você tem alguma das quatro condições abaixo? (Perda de peso, IMC baixo, etc)",14,MULTIPLE_CHOICE,true,,"2f9699c0-45b6-42b6-b4dd-8aee12cf4e2c"
+fa210818-e3cd-4639-8717-c75496e77152,Você tem dificuldade para caminhar capaz de impedir a realização de alguma atividade do cotidiano?,15,MULTIPLE_CHOICE,true,,"43f4b521-116e-4698-bff5-d20afcbc76a0"
+"65fc98e8-f4ab-49c0-adc1-2678b805ec49",Você teve duas ou mais quedas no último ano?,16,MULTIPLE_CHOICE,true,,"43f4b521-116e-4698-bff5-d20afcbc76a0"
+"33f72a74-656b-45bd-9548-f66f73d15c72","Você perde urina ou fezes, sem querer, em algum momento?",17,MULTIPLE_CHOICE,true,,"1eddd219-23a4-4171-9388-957a43bc448d"
+"94ce0279-afa2-481c-8089-207270900475",Você tem problemas de visão capazes de impedir a realização de alguma atividade do cotidiano?,18,MULTIPLE_CHOICE,true,,"7781f3ab-788e-487b-807c-37c7e2175d41"
+dade9fab-8640-45b8-9d29-9f9806f90f0e,Você tem problemas de audição capazes de impedir a realização de alguma atividade do cotidiano?,19,MULTIPLE_CHOICE,true,,"48fbdbf9-bdb2-40a9-b9dc-576ed52bfd87"
+b131722c-c18d-4aa6-9f7a-bee715fcabcf,"Você tem alguma das três condições? (Polipatologia, Polifarmácia, Internação recente)",20,MULTIPLE_CHOICE,true,"691f7207-f7b6-4b63-96ed-2bd0af3d44ae",
