@@ -20,6 +20,9 @@ import type {
   DomainHistoryResponse,
   AssessmentDetailResponse,
   FragilityAssessmentRow,
+  IVCF_Assessment,
+  Daily_Assessment,
+  ParticipantEvolutionDailyData,
 } from "./interfaces/ivcf-evolution.interface";
 
 @Injectable()
@@ -538,6 +541,35 @@ export class QuestionnaireService {
     return this.prisma.questionnaireResponse.findMany({
       where: { id: { in: ids } },
       orderBy: { date: "asc" },
+      include: {
+        answers: {
+          include: {
+            selectedOption: { select: { score: true, label: true } },
+            question: {
+              select: {
+                order: true,
+                statement: true,
+                group: { select: { order: true } },
+                subGroup: {
+                  select: {
+                    group: { select: { order: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  private async getAllIvcfResponsesQuery(participantId: string) {
+    return this.prisma.questionnaireResponse.findMany({
+      where: {
+        participantId,
+        questionnaire: { slug: "ivcf-20" },
+      },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
       include: {
         answers: {
           include: {
@@ -1723,6 +1755,52 @@ export class QuestionnaireService {
       participantId,
       participantName: participant.user.fullName,
       assessments,
+    };
+  }
+
+  async getParticipantEvolutionDaily(
+    participantId: string,
+  ): Promise<ParticipantEvolutionDailyData> {
+    const [participant, responses] = await Promise.all([
+      this.getParticipantWithName(participantId),
+      this.getAllIvcfResponsesQuery(participantId),
+    ]);
+
+    const groupedAssessments = new Map<string, IVCF_Assessment[]>();
+
+    for (const response of responses) {
+      const assessment = this.computeAssessment(response);
+      const classification = this.classifyRisk(assessment.totalScore);
+      const dateKey = response.date.toISOString().slice(0, 10);
+
+      if (!groupedAssessments.has(dateKey)) {
+        groupedAssessments.set(dateKey, []);
+      }
+
+      groupedAssessments.get(dateKey)?.push({
+        id: assessment.id,
+        date: assessment.date,
+        createdAt: response.createdAt.toISOString(),
+        totalScore: assessment.totalScore,
+        riskLevel: classification,
+        classification,
+        domains: assessment.domains,
+        rawResponses: assessment.rawResponses,
+      });
+    }
+
+    const dailyAssessments: Daily_Assessment[] = Array.from(
+      groupedAssessments.entries(),
+    ).map(([date, assessments]) => ({
+      date,
+      hasMultipleAssessments: assessments.length > 1,
+      assessments,
+    }));
+
+    return {
+      participantId,
+      participantName: participant.user.fullName,
+      dailyAssessments,
     };
   }
 

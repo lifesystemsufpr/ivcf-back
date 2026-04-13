@@ -9,6 +9,54 @@ export interface IvcfDomainScores {
   comorbidities: number;
 }
 
+// temporário
+export type FrailtyClassification = "Robusto" | "Pré-frágil" | "Frágil";
+
+// temporário
+export interface IVCF_DomainScores {
+  age: number;
+  selfPerception: number;
+  functionalCapacity: number;
+  cognition: number;
+  mood: number;
+  mobility: number;
+  communication: number;
+  comorbidities: number;
+}
+
+// temporário
+export interface IVCF_Assessment {
+  id: string;
+  date: string;
+  createdAt: string;
+  totalScore: number;
+  riskLevel: FrailtyClassification;
+  classification: FrailtyClassification;
+  domains: IVCF_DomainScores;
+  rawResponses: Record<string, string>;
+}
+
+// temporário
+export interface Daily_Assessment {
+  date: string;
+  hasMultipleAssessments: boolean;
+  assessments: IVCF_Assessment[];
+}
+
+// temporário
+export interface ParticipantEvolutionData {
+  participantId: string;
+  participantName: string;
+  assessments: IVCF_Assessment[];
+}
+
+// temporário
+export interface ParticipantEvolutionDailyData {
+  participantId: string;
+  participantName: string;
+  dailyAssessments: Daily_Assessment[];
+}
+
 export interface IvcfScoreResult {
   domains: IvcfDomainScores;
   totalScore: number;

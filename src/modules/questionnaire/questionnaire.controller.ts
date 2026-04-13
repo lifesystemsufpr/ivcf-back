@@ -20,6 +20,7 @@ import { Payload } from "../auth/interfaces/auth.interface";
 import type {
   FragilityDashboardResponse,
   CurrentMonthStatsResponse,
+  ParticipantEvolutionDailyData,
 } from "./interfaces/ivcf-evolution.interface";
 
 @Controller("questionnaires")
@@ -57,6 +58,13 @@ export class QuestionnaireController {
   @Get("participant/:participantId/evolution")
   getParticipantEvolution(@Param("participantId") id: string) {
     return this.service.getParticipantEvolution(id);
+  }
+
+  @Get("participant/:participantId/evolution/daily")
+  getParticipantEvolutionDaily(
+    @Param("participantId") id: string,
+  ): Promise<ParticipantEvolutionDailyData> {
+    return this.service.getParticipantEvolutionDaily(id);
   }
 
   @Get("participant/:participantId/summary")
