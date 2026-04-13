@@ -14,7 +14,7 @@ const prisma = new PrismaClient({ adapter });
 // CONFIG
 const HEALTH_PROFESSIONAL_ID = "372ef6aa-69e8-4f67-adbf-f247697a0573";
 const QUESTIONNAIRE_SLUG = "ivcf-20";
-const FILE_PATH = "C:\\Users\\danie\\Downloads/Coletas IVCF-20 Sofia (respostas).xlsx";
+const FILE_PATH = "C:\\Users\\danie\\Downloads/Coletas IVCF-20 Sofia.xlsx";
 const LOG_FILE = "./import.log";
 
 // RANGE
@@ -23,18 +23,14 @@ const END_ROW = 116;
 
 const DRY_RUN = process.argv.includes("--dry-run");
 
-const OPTION_ALIASES: Record<string, string> = {
-    "nao ou nao faz compras por outros motivos que nao a saude": "nao",
-};
-
-// const ANSWERS_ALIASES: Record<string, string> = {
-//     "Por causa de sua saúde ou condição física, você deixou de controlar seu dinheiro, gasto ou pagar as contas de sua casa?" : "por causa de sua saude ou condicao fisica, voce deixou de controlar seu dinheiro?",
-//     "Por causa de sua saúde ou condição física, você deixou de realizar pequenos trabalhos domésticos, como lavar louça, arrumar a casa ou fazer limpeza leve?": "por causa de sua saude ou condicao fisica, voce deixou de realizar pequenos trabalhos domesticos?",
-//     "Você tem alguma das três condições abaixo relacionadas?  (FAZER MEDIDAS)": "voce tem alguma das quatro condicoes abaixo? (perda de peso, imc baixo, etc)",
-//     "Você tem problemas de visão capazes de impedir a realização de alguma atividade do cotidiano? (É permitido o uso de óculos ou lentes de contato.)   ": "voce tem problemas de visao capazes de impedir a realizacao de alguma atividade do cotidiano?",
-//     "Você tem problemas de audição capazes de impedir a realização de alguma atividade do cotidiano? (É permitido o uso de aparelhos de audição.)  ": "voce tem problemas de audicao capazes de impedir a realizacao de alguma atividade do cotidiano?",
-//     "Você tem alguma das três condições abaixo relacionadas?": "voce tem alguma das tres condicoes? (polipatologia, polifarmacia, internacao recente)"
-// }
+const EXCEL_ANSWERS_ALIASES: Record<string, string> = {
+    "Por causa de sua saúde ou condição física, você deixou de controlar seu dinheiro, gasto ou pagar as contas de sua casa?" : "por causa de sua saude ou condicao fisica, voce deixou de controlar seu dinheiro?",
+    "Por causa de sua saúde ou condição física, você deixou de realizar pequenos trabalhos domésticos, como lavar louça, arrumar a casa ou fazer limpeza leve?": "por causa de sua saude ou condicao fisica, voce deixou de realizar pequenos trabalhos domesticos?",
+    "Você tem alguma das três condições abaixo relacionadas?  (FAZER MEDIDAS)": "voce tem alguma das quatro condicoes abaixo? (perda de peso, imc baixo, etc)",
+    "Você tem problemas de visão capazes de impedir a realização de alguma atividade do cotidiano? (É permitido o uso de óculos ou lentes de contato.)   ": "voce tem problemas de visao capazes de impedir a realizacao de alguma atividade do cotidiano?",
+    "Você tem problemas de audição capazes de impedir a realização de alguma atividade do cotidiano? (É permitido o uso de aparelhos de audição.)  ": "voce tem problemas de audicao capazes de impedir a realizacao de alguma atividade do cotidiano?",
+    "Você tem alguma das três condições abaixo relacionadas?": "voce tem alguma das tres condicoes? (polipatologia, polifarmacia, internacao recente)"
+}
 
 const ANSWERS_ALIASES: Record<string, string> = {
     "por causa de sua saude ou condicao fisica, voce deixou de controlar seu dinheiro?": "Por causa de sua saúde ou condição física, você deixou de controlar seu dinheiro, gasto ou pagar as contas de sua casa?",
@@ -111,10 +107,22 @@ const loadQuestionMap = () => {
     return map;
 };
 
+const OPTION_ALIASES: Record<string, string> = {
+    "Não": "Nenhuma",
+    "nao": "Nenhuma",
+    "uso regular de cinco ou mais medicamentos diferentes, todo dia" : "Uso de cinco ou mais medicamentos (polifarmácia)",
+    "circunferencia (perimetro) da panturrilha a < 31cm": "Circunferência da panturrilha menor que 31 cm",
+    "indice de massa corporal (imc) menor que 22kg/m2": "IMC menor que 22 kg/m²",
+    "cinco ou mais doencas cronicas.": "Cinco ou mais doenças crônicas (polipatologia)",
+    "tempo gasto no teste de velocidade da marcha (4m) > 5 segundos": "Tempo de marcha (4 m) maior que 5 segundos",
+    "perda de peso nao intencional de 4,5kg ou 5% do peso corporal no ultimo ano ou 6kg nos ultimos 6 meses ou 3kg no ultimo mes": "Perda de peso maior que 4,5 kg no último ano",
+    "internacao recente, nos ultimos seis meses.": "Internação hospitalar nos últimos 6 meses"
+};
+
 // OPTION
 const findOption = (question: any, value: string) => {
     const valNorm = normalize(value);
-
+    console.log(value)
     // 1. match exato
     let option = question.options.find((opt: any) =>
         normalize(opt.label) === valNorm
@@ -136,6 +144,126 @@ const findOption = (question: any, value: string) => {
             normalize(opt.label) === "nao"
         );
         if (option) return option;
+    }
+
+    if (OPTION_ALIASES[valNorm]) {
+        const alias = OPTION_ALIASES[valNorm];
+        if (alias) {
+            option = question.options.find((opt: any) =>
+                normalize(opt.label).includes(alias)
+            );
+            if (option) return option;
+        }
+    }
+
+    return null;
+};
+
+const findOptions = (question: any, value: string) => {
+    const valNorm = normalize(value);
+
+    // 🔥 quebra respostas múltiplas (vírgula, ponto e vírgula, " e ")
+    const parts = valNorm
+        .split(";")
+        .map(p => p.trim())
+        .filter(Boolean);
+
+    const matchedOptions: any[] = [];
+
+    for (const part of parts) {
+        let option =
+            // 1. exato
+            question.options.find((opt: any) =>
+                normalize(opt.label) === part
+            ) ||
+            // 2. includes
+            question.options.find((opt: any) =>
+                part.includes(normalize(opt.label))
+            ) ||
+            // 3. include reverse
+            question.options.find((opt: any) =>
+                normalize(opt.label).includes(part)
+            ) ||
+            // 3. fallback "não"
+            (part.startsWith("nao")
+                ? question.options.find((opt: any) =>
+                    normalize(opt.label) === "nao"
+                )
+                : null);
+
+        // 4. alias
+        if (!option && OPTION_ALIASES[part]) {
+            const alias = normalize(OPTION_ALIASES[part]);
+
+            option = question.options.find((opt: any) =>
+                normalize(opt.label).includes(alias)
+            );
+        }
+
+        if (option) {
+            matchedOptions.push(option);
+        } else {
+            console.log("⚠️ Option não encontrada (multi):", part);
+        }
+    }
+
+    return matchedOptions;
+};
+
+const resolveQuestionKey = (
+    column: string,
+    questionMap: Map<string, string>
+): string | null => {
+    const normalizedColumn = cleanStatement(column);
+
+    // 1. match exato
+    if (questionMap.has(normalizedColumn)) {
+        return normalizedColumn;
+    }
+
+    // 2. alias direto
+    let alias: string | null = null;
+
+    for (const key in EXCEL_ANSWERS_ALIASES) {
+        if (
+            column.includes(key) ||
+            key.includes(column)
+        ) {
+            alias = EXCEL_ANSWERS_ALIASES[key];
+            break;
+        }
+    }
+
+    if (alias) {
+        const aliasNormalized = cleanStatement(alias);
+
+        if (questionMap.has(aliasNormalized)) {
+            return aliasNormalized;
+        }
+    }
+
+    // 3. match parcial (como você pediu)
+    for (const key of questionMap.keys()) {
+        if (
+            normalizedColumn.includes(key) ||
+            key.includes(normalizedColumn)
+        ) {
+            return key;
+        }
+    }
+
+    // 4. alias + parcial
+    if (alias) {
+        const aliasNormalized = cleanStatement(alias);
+
+        for (const key of questionMap.keys()) {
+            if (
+                aliasNormalized.includes(key) ||
+                key.includes(aliasNormalized)
+            ) {
+                return key;
+            }
+        }
     }
 
     return null;
@@ -319,11 +447,11 @@ const run = async () => {
                 continue;
             }
 
-            if (!questionMap.has(normalizedColumn)) {
-                if (normalizedColumn in ANSWERS_ALIASES) {
-                    //TODO aqui verificar se o normalized não está no aliases de ANSWERS
-                }
-                throw new Error(`❌ Coluna sem match: ${column}`);
+            //TODO: Aqui quero replicar para outros lugares que fazem a mesma verificação, e caso não encontre de primeira a pergunta faz um fallback na constant que criei
+            const resolved = resolveQuestionKey(column, questionMap);
+
+            if (!resolved) {
+                throw new Error(`❌ Coluna sem match 1: ${column}`);
             }
         }
     }
@@ -367,44 +495,49 @@ const run = async () => {
                         continue;
                     }
 
-                    const normalizedColumn = cleanStatement(column);
-                    answeredQuestions.add(normalizedColumn);
+                    const resolved = resolveQuestionKey(column, questionMap);
 
-                    if (!questionMap.has(normalizedColumn)) {
-                        console.log("Ignorando coluna sem match:", column);
-                        continue; // 🔥 ignora colunas não mapeadas
+                    if (!resolved) {
+                        console.log("Ignorando coluna sem match 2:", column);
+                        continue;
                     }
 
-                    const questionId = questionMap.get(cleanStatement(column));
+                    answeredQuestions.add(resolved);
+
+                    const questionId = questionMap.get(resolved);
                     const question = questions.find(q => q.id === questionId);
 
                     if (!question) {
                         throw new Error("Questão não encontrada")
                     }
 
-                    let selectedOptionId = null;
-                    let valueText: string | null = null;
-
                     if (question.type === "MULTIPLE_CHOICE") {
-                        const option = findOption(question, value);
+                        const options = findOptions(question, value);
 
-                        if (!option) {
-                            throw new Error(`Option não encontrada: ${value}`);
+                        if (!options.length) {
+                            throw new Error(`Option não encontrada: ${value} | para pergunta -> ${question.statement}`);
                         }
 
-                        selectedOptionId = option.id;
+                        for (const opt of options) {
+                            await tx.answer.create({
+                                data: {
+                                    questionnaireResponseId: response.id,
+                                    questionId: question.id,
+                                    selectedOptionId: opt.id,
+                                    valueText: null,
+                                },
+                            });
+                        }
                     } else {
-                        valueText = String(value);
+                        await tx.answer.create({
+                            data: {
+                                questionnaireResponseId: response.id,
+                                questionId: question.id,
+                                selectedOptionId: null,
+                                valueText: String(value),
+                            },
+                        });
                     }
-
-                    await tx.answer.create({
-                        data: {
-                            questionnaireResponseId: response.id,
-                            questionId: question.id,
-                            selectedOptionId,
-                            valueText,
-                        },
-                    });
                 }
 
                 const missingAnswers: string[] = [];
