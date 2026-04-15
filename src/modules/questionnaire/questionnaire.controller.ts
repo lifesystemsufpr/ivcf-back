@@ -128,4 +128,10 @@ export class QuestionnaireController {
   getCurrentMonthStats(@RequestUser() user: Payload): Promise<CurrentMonthStatsResponse> {
     return this.service.getCurrentMonthStats(user.id);
   }
+
+  @Roles([SystemRole.MANAGER])
+  @Post("responses/recompute")
+  recomputeResponses() {
+    return this.service.recomputeAllResponses();
+  }
 }

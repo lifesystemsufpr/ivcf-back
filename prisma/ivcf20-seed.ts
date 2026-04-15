@@ -163,7 +163,7 @@ async function main() {
                   options: {
                     create: [
                       { label: 'Não', score: 0, order: 1 },
-                      { label: 'Sim', score: 0, order: 2 },
+                      { label: 'Sim', score: 1, order: 2 },
                     ],
                   },
                 },
@@ -175,7 +175,7 @@ async function main() {
                   options: {
                     create: [
                       { label: 'Não', score: 0, order: 1 },
-                      { label: 'Sim', score: 0, order: 2 },
+                      { label: 'Sim', score: 1, order: 2 },
                     ],
                   },
                 },
@@ -187,7 +187,7 @@ async function main() {
                   options: {
                     create: [
                       { label: 'Não', score: 0, order: 1 },
-                      { label: 'Sim', score: 4, order: 2 },
+                      { label: 'Sim', score: 2, order: 2 },
                     ],
                   },
                 },
@@ -208,7 +208,7 @@ async function main() {
                   options: {
                     create: [
                       { label: 'Não', score: 0, order: 1 },
-                      { label: 'Sim', score: 0, order: 2 },
+                      { label: 'Sim', score: 2, order: 2 },
                     ],
                   },
                 },
