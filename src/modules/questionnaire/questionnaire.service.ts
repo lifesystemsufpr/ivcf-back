@@ -69,6 +69,74 @@ export class QuestionnaireService {
     });
   }
 
+  async recomputeAllResponses() {
+    const responses = await this.prisma.questionnaireResponse.findMany({
+      where: { questionnaire: { slug: "ivcf-20" } },
+      select: {
+        id: true,
+        totalScore: true,
+        classification: true,
+        answers: {
+          select: {
+            selectedOption: { select: { score: true } },
+            question: {
+              select: {
+                id: true,
+                order: true,
+                group: { select: { order: true } },
+                subGroup: { select: { group: { select: { order: true } } } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const sample: Array<{
+      id: string;
+      before: { totalScore: number; classification: string | null };
+      after: { totalScore: number; classification: string };
+    }> = [];
+    let updated = 0;
+
+    for (const response of responses) {
+      const { totalScore } = this.computeDomainsFromAnswers(response.answers);
+      const classification = this.classifyResponseRisk(totalScore);
+
+      if (
+        response.totalScore === totalScore &&
+        response.classification === classification
+      ) {
+        continue;
+      }
+
+      await this.prisma.questionnaireResponse.update({
+        where: { id: response.id },
+        data: { totalScore, classification },
+      });
+
+      if (sample.length < 20) {
+        sample.push({
+          id: response.id,
+          before: {
+            totalScore: response.totalScore,
+            classification: response.classification,
+          },
+          after: { totalScore, classification },
+        });
+      }
+      updated += 1;
+    }
+
+    return { updated, total: responses.length, sample };
+  }
+
+  private classifyResponseRisk(totalScore: number) {
+    if (totalScore >= 15) return "Frágil";
+    if (totalScore >= 7) return "Pré-Fragil";
+    return "Robusto";
+  }
+
   async createResponse(dto: CreateResponseDto) {
     const [participant, healthProfessional, questionnaire] = await Promise.all([
       this.prisma.participant.findUnique({
