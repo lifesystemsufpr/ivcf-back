@@ -304,10 +304,6 @@ export class QuestionnaireService {
         groupTotal = Math.min(groupTotal, 4);
       }
 
-      if (groupData.order === 6) {
-        groupTotal = Math.min(groupTotal, 2);
-      }
-
       if (groupData.order === 9) {
         groupTotal = Math.min(groupTotal, 4);
       }
@@ -598,7 +594,6 @@ export class QuestionnaireService {
 
   private static readonly GROUP_CAPS: Record<number, number> = {
     3: 4,
-    6: 2,
     9: 4,
   };
 
