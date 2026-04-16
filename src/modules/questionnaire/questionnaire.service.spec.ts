@@ -157,9 +157,9 @@ describe("QuestionnaireService - IVCF scoring", () => {
       expect(classify(6)).toBe("Robusto");
     });
 
-    it("7-14 is Pré-Fragil", () => {
-      expect(classify(7)).toBe("Pré-Fragil");
-      expect(classify(14)).toBe("Pré-Fragil");
+    it("7-14 is Pré-frágil", () => {
+      expect(classify(7)).toBe("Pré-frágil");
+      expect(classify(14)).toBe("Pré-frágil");
     });
 
     it(">=15 is Frágil", () => {
