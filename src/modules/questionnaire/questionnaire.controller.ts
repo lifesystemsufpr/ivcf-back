@@ -129,7 +129,7 @@ export class QuestionnaireController {
     return this.service.getCurrentMonthStats(user.id);
   }
 
-  @Roles([SystemRole.MANAGER])
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Post("responses/recompute")
   recomputeResponses() {
     return this.service.recomputeAllResponses();
