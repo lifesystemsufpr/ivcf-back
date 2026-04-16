@@ -43,6 +43,19 @@ export class QuestionnaireService {
 
   private static readonly MULTI_SELECT_QUESTION_ORDERS = new Set([14, 20]);
 
+  private static readonly FRAILTY_LABELS = {
+    robust: "Robusto",
+    preFrail: "Pré-frágil",
+    frail: "Frágil",
+  } as const;
+
+  private static readonly LEGACY_FRAILTY_LABELS: Record<string, string> = {
+    "Pré-Fragil": QuestionnaireService.FRAILTY_LABELS.preFrail,
+    "Pré-fragil": QuestionnaireService.FRAILTY_LABELS.preFrail,
+    "Pre-Fragil": QuestionnaireService.FRAILTY_LABELS.preFrail,
+    "Pre-fragil": QuestionnaireService.FRAILTY_LABELS.preFrail,
+  };
+
   async getIvcfStructure() {
     return await this.prisma.questionnaire.findUnique({
       where: { slug: "ivcf-20" },
@@ -102,10 +115,16 @@ export class QuestionnaireService {
     for (const response of responses) {
       const { totalScore } = this.computeDomainsFromAnswers(response.answers);
       const classification = this.classifyResponseRisk(totalScore);
+      const normalizedCurrentClassification =
+        this.normalizeFrailtyClassification(response.classification);
+      const shouldNormalizeStoredLabel =
+        response.classification !== null &&
+        response.classification !== normalizedCurrentClassification;
 
       if (
         response.totalScore === totalScore &&
-        response.classification === classification
+        normalizedCurrentClassification === classification &&
+        !shouldNormalizeStoredLabel
       ) {
         continue;
       }
@@ -132,9 +151,20 @@ export class QuestionnaireService {
   }
 
   private classifyResponseRisk(totalScore: number) {
-    if (totalScore >= 15) return "Frágil";
-    if (totalScore >= 7) return "Pré-Fragil";
-    return "Robusto";
+    if (totalScore >= 15) return QuestionnaireService.FRAILTY_LABELS.frail;
+    if (totalScore >= 7) return QuestionnaireService.FRAILTY_LABELS.preFrail;
+    return QuestionnaireService.FRAILTY_LABELS.robust;
+  }
+
+  private normalizeFrailtyClassification(classification: string | null) {
+    if (!classification) {
+      return classification;
+    }
+
+    return (
+      QuestionnaireService.LEGACY_FRAILTY_LABELS[classification] ||
+      classification
+    );
   }
 
   async createResponse(dto: CreateResponseDto) {
@@ -274,10 +304,6 @@ export class QuestionnaireService {
         groupTotal = Math.min(groupTotal, 4);
       }
 
-      if (groupData.order === 6) {
-        groupTotal = Math.min(groupTotal, 2);
-      }
-
       if (groupData.order === 9) {
         groupTotal = Math.min(groupTotal, 4);
       }
@@ -285,12 +311,7 @@ export class QuestionnaireService {
       finalScore += groupTotal;
     });
 
-    let classification = "Robusto";
-    if (finalScore >= 7 && finalScore <= 14) {
-      classification = "Pré-Fragil";
-    } else if (finalScore >= 15) {
-      classification = "Frágil";
-    }
+    const classification = this.classifyResponseRisk(finalScore);
 
     await this.prisma.healthProfessionalParticipant.upsert({
       where: {
@@ -312,7 +333,7 @@ export class QuestionnaireService {
         healthProfessionalId: dto.healthProfessionalId,
         questionnaireId: dto.questionnaireId,
         totalScore: finalScore,
-        classification: classification,
+        classification,
         answers: {
           create: normalizedAnswers,
         },
@@ -500,7 +521,7 @@ export class QuestionnaireService {
       id: r.id,
       date: r.date,
       totalScore: r.totalScore,
-      classification: r.classification,
+      classification: this.normalizeFrailtyClassification(r.classification),
       questionnaireTitle: r.questionnaire.title,
       questionnaireSlug: r.questionnaire.slug,
       participantId: r.participant.id,
@@ -573,7 +594,6 @@ export class QuestionnaireService {
 
   private static readonly GROUP_CAPS: Record<number, number> = {
     3: 4,
-    6: 2,
     9: 4,
   };
 
@@ -1058,12 +1078,7 @@ export class QuestionnaireService {
       0,
     );
 
-    let riskLevel = "Robusto";
-    if (totalScore >= 7 && totalScore <= 14) {
-      riskLevel = "Pré-Fragil";
-    } else if (totalScore >= 15) {
-      riskLevel = "Frágil";
-    }
+    const riskLevel = this.classifyResponseRisk(totalScore);
 
     return {
       id: response.id,
