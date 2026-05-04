@@ -363,7 +363,7 @@ async function main() {
                   questions: {
                     create: {
                       statement:
-                        'Você tem problemas de visão capazes de impedir a realização de alguma atividade do cotidiano?',
+                        'Você tem problemas de visão capazes de impedir a realização de alguma atividade do cotidiano? É permitido o uso de óculos ou lentes de contato.',
                       order: 18,
                       type: QuestionType.MULTIPLE_CHOICE,
                       options: {
@@ -381,7 +381,7 @@ async function main() {
                   questions: {
                     create: {
                       statement:
-                        'Você tem problemas de audição capazes de impedir a realização de alguma atividade do cotidiano?',
+                        'Você tem problemas de audição capazes de impedir a realização de alguma atividade do cotidiano? É permitido o uso de aparelhos de audição.',
                       order: 19,
                       type: QuestionType.MULTIPLE_CHOICE,
                       options: {
