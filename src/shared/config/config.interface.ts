@@ -4,6 +4,7 @@ export interface AppConfig {
   swagger: SwaggerConfig;
   security: SecurityConfig;
   email: EmailConfig;
+  passwordRecovery: PasswordRecoveryConfig;
 }
 
 export interface NestConfig {
@@ -27,6 +28,11 @@ export interface EmailConfig {
   smtpPassword: string;
   fromAddress: string;
   fromName: string;
+}
+
+export interface PasswordRecoveryConfig {
+  frontendBaseUrl: string;
+  tokenExpiryMinutes: number;
 }
 
 export interface CorsConfig {
