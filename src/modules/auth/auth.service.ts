@@ -15,8 +15,12 @@ import {
   hashPassword,
 } from "src/shared/functions/hash-password";
 import { ConfigService } from "@nestjs/config";
-import { SecurityConfig } from "src/shared/config/config.interface";
+import {
+  SecurityConfig,
+  PasswordRecoveryConfig,
+} from "src/shared/config/config.interface";
 import { EmailService } from "src/shared/services/email.service";
+import { createHash, randomBytes } from "crypto";
 
 @Injectable()
 export class AuthService {
@@ -165,70 +169,72 @@ export class AuthService {
       return;
     }
 
-    const securityConfig =
-      this.configService.getOrThrow<SecurityConfig>("security");
+    const passwordRecoveryConfig =
+      this.configService.getOrThrow<PasswordRecoveryConfig>(
+        "passwordRecovery",
+      );
 
-    const payload = { sub: user.id, email: user.email };
-    const resetToken = await this.jwtService.signAsync(payload, {
-      secret: securityConfig.jwtSecret + user.password,
-      expiresIn: "15m",
+    const resetToken = this.generateResetToken();
+    const resetTokenHash = this.hashResetToken(resetToken);
+    const expiresAt = new Date(
+      Date.now() + passwordRecoveryConfig.tokenExpiryMinutes * 60 * 1000,
+    );
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetTokenHash,
+        passwordResetExpiresAt: expiresAt,
+        passwordResetUsedAt: null,
+      },
     });
 
-    const frontendUrl =
-      this.configService.get<string>("FRONTEND_URL") || "http://localhost:3000";
-    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}&email=${user.email}`;
+    const resetLink = `${passwordRecoveryConfig.frontendBaseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
 
     await this.emailService.sendPasswordResetEmail(
       user.email,
       user.fullName,
       resetLink,
+      passwordRecoveryConfig.tokenExpiryMinutes,
     );
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    const isTokenValidFormat = (
-      tokenPayload: unknown,
-    ): tokenPayload is { sub: string } => {
-      return (
-        typeof tokenPayload === "object" &&
-        tokenPayload !== null &&
-        "sub" in tokenPayload &&
-        typeof (tokenPayload as Record<string, unknown>).sub === "string"
-      );
-    };
-
-    const decodedToken: unknown = this.jwtService.decode(token);
-
-    if (!isTokenValidFormat(decodedToken)) {
-      throw new BadRequestException("Token mal formatado.");
-    }
-
-    const { sub } = decodedToken;
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: sub },
+    const resetTokenHash = this.hashResetToken(token);
+    const user = await this.prisma.user.findFirst({
+      where: { passwordResetToken: resetTokenHash },
     });
 
-    if (!user) {
-      throw new BadRequestException("Usuário não encontrado.");
+    if (!user || !user.passwordResetToken) {
+      throw new BadRequestException("Token inválido ou expirado.");
     }
 
-    const securityConfig =
-      this.configService.getOrThrow<SecurityConfig>("security");
-
-    try {
-      await this.jwtService.verifyAsync(token, {
-        secret: securityConfig.jwtSecret + user.password,
-      });
-    } catch {
+    if (!user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
       throw new BadRequestException("Token inválido ou expirado.");
+    }
+
+    if (user.passwordResetUsedAt) {
+      throw new BadRequestException("Token de recuperação já foi utilizado.");
     }
 
     const hashedPassword = await hashPassword(newPassword);
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { password: hashedPassword },
+      data: {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null,
+        passwordResetUsedAt: new Date(),
+      },
     });
+  }
+
+  private generateResetToken(): string {
+    return randomBytes(32).toString("hex");
+  }
+
+  private hashResetToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
   }
 }
