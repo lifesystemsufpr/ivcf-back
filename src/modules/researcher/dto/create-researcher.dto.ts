@@ -1,4 +1,10 @@
-import { ValidateNested, IsString, IsUUID, IsNotEmpty } from "class-validator";
+import {
+  ValidateNested,
+  IsString,
+  IsUUID,
+  IsNotEmpty,
+  IsEmail,
+} from "class-validator";
 import { CreateUserDto } from "src/modules/users/dtos/create-user.dto";
 import { ApiProperty, OmitType } from "@nestjs/swagger";
 import { SystemRole } from "@prisma/client";
@@ -12,6 +18,7 @@ export class CreateResearcherUserDto extends OmitType(CreateUserDto, [
 export class CreateResearcherDto {
   @ValidateNested()
   @Type(() => CreateResearcherUserDto)
+  @IsNotEmpty()
   user: CreateResearcherUserDto;
 
   @ApiProperty({
@@ -20,6 +27,7 @@ export class CreateResearcherDto {
   })
   @IsNotEmpty()
   @IsString()
+  @IsEmail({}, { message: "O e-mail fornecido é inválido." })
   email: string;
 
   @ApiProperty({
