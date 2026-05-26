@@ -1,6 +1,6 @@
 import { ApiProperty, OmitType } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsNotEmpty, IsString, ValidateNested } from "class-validator";
+import { IsNotEmpty, IsString, Matches, ValidateNested } from "class-validator";
 import { CreateUserDto } from "src/modules/users/dtos/create-user.dto";
 
 export class CreateHealthProfessionalUserDto extends OmitType(CreateUserDto, [
@@ -10,6 +10,7 @@ export class CreateHealthProfessionalUserDto extends OmitType(CreateUserDto, [
 export class CreateHealthProfessionalDto {
   @ValidateNested()
   @Type(() => CreateHealthProfessionalUserDto)
+  @IsNotEmpty()
   user: CreateHealthProfessionalUserDto;
 
   @ApiProperty({
@@ -18,5 +19,8 @@ export class CreateHealthProfessionalDto {
   })
   @IsNotEmpty()
   @IsString()
+  @Matches(/^\s*\p{L}+(?:\s+\p{L}+)*\s*$/u, {
+    message: "O vínculo deve conter apenas letras e espaços.",
+  })
   speciality: string;
 }

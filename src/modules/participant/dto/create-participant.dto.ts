@@ -20,6 +20,7 @@ export class CreateParticipantUserDto extends OmitType(CreateUserDto, [
 export class CreateParticipantDto {
   @ValidateNested()
   @Type(() => CreateParticipantUserDto)
+  @IsNotEmpty()
   user: CreateParticipantUserDto;
 
   @ApiProperty({

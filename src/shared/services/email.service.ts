@@ -31,6 +31,7 @@ export class EmailService {
     email: string,
     fullName: string,
     resetLink: string,
+    expiresInMinutes: number,
   ): Promise<void> {
     try {
       const emailConfig = this.configService.getOrThrow<EmailConfig>("email");
@@ -39,7 +40,11 @@ export class EmailService {
         from: `"${emailConfig.fromName}" <${emailConfig.fromAddress}>`,
         to: email,
         subject: "Recuperação de Senha - TecnoAging",
-        html: this.getPasswordResetEmailTemplate(fullName, resetLink),
+        html: this.getPasswordResetEmailTemplate(
+          fullName,
+          resetLink,
+          expiresInMinutes,
+        ),
       };
 
       await this.transporter.sendMail(mailOptions);
@@ -55,7 +60,12 @@ export class EmailService {
   private getPasswordResetEmailTemplate(
     fullName: string,
     resetLink: string,
+    expiresInMinutes: number,
   ): string {
+    const expirationMessage =
+      expiresInMinutes === 1
+        ? "1 minuto"
+        : `${expiresInMinutes} minutos`;
     return `
     <!DOCTYPE html>
     <html>
@@ -85,7 +95,7 @@ export class EmailService {
             <p style="word-break: break-all; color: #3498db;">${resetLink}</p>
             <div class="warning">
               <p><strong>⚠️ Aviso de Segurança:</strong></p>
-              <p>Este link é válido por apenas 15 minutos. Após este período, você precisará solicitar um novo link de recuperação.</p>
+              <p>Este link é válido por ${expirationMessage}. Após este período, você precisará solicitar um novo link de recuperação.</p>
               <p>Nunca compartilhe este link com outra pessoa.</p>
             </div>
           </div>

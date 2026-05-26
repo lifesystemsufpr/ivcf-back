@@ -1,5 +1,10 @@
 import { Logger } from "@nestjs/common";
-import { AppConfig, SecurityConfig, EmailConfig } from "./config.interface";
+import {
+  AppConfig,
+  SecurityConfig,
+  EmailConfig,
+  PasswordRecoveryConfig,
+} from "./config.interface";
 
 const DEFAULT_EXP_TIME = 86400;
 const SEVEN_DAYS_IN_SECONDS = 604800; // 604800
@@ -78,6 +83,15 @@ export default () => {
     },
     security: securityConfig,
     email: emailConfig,
+    passwordRecovery: {
+      frontendBaseUrl:
+        process.env.PASSWORD_RECOVERY_FRONTEND_URL ||
+        process.env.FRONTEND_URL ||
+        "http://localhost:3000",
+      tokenExpiryMinutes: process.env.PASSWORD_RECOVERY_TOKEN_EXPIRY_MINUTES
+        ? Number(process.env.PASSWORD_RECOVERY_TOKEN_EXPIRY_MINUTES)
+        : 15,
+    } satisfies PasswordRecoveryConfig,
   };
 
   const logger = new Logger("AppConfig");

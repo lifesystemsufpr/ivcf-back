@@ -3,9 +3,11 @@ import { Gender, SystemRole } from "@prisma/client";
 import {
   IsBoolean,
   IsEnum,
+  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MinLength,
 } from "class-validator";
 
@@ -16,6 +18,9 @@ export class CreateUserDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^\s*\p{L}+(?:\s+\p{L}+)+\s*$/u, {
+    message: "O nome completo deve conter pelo menos nome e sobrenome.",
+  })
   fullName: string;
 
   @ApiProperty({
@@ -24,6 +29,7 @@ export class CreateUserDto {
   })
   @IsString()
   @IsNotEmpty()
+  @IsEmail({}, { message: "O e-mail fornecido é inválido." })
   email: string;
 
   @ApiProperty({
