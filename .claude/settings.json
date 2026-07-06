@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/dev/Work/solutions/Backend_Solutions/**)",
+      "Read(//home/dev/Work/solutions/Backend_Solutions/src/**)"
+    ]
+  }
+}

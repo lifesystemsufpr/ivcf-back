@@ -23,9 +23,10 @@ describe("Auth - Regression Tests", () => {
     fullName_normalized: "test user",
     password: "mock_hashed_value", // eslint-disable-line sonarjs/no-hardcoded-passwords
     active: true,
-    gender: null,
     role: "PARTICIPANT" as SystemRole,
-    phone: null,
+    passwordResetToken: null,
+    passwordResetExpiresAt: null,
+    passwordResetUsedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

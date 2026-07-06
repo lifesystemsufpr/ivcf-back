@@ -1,5 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { Gender, SystemRole } from "@prisma/client";
+import { SystemRole } from "@prisma/client";
+import { Transform } from "class-transformer";
+import { normalizeEmail } from "src/shared/functions/normalize-email";
 import {
   IsBoolean,
   IsEnum,
@@ -29,6 +31,7 @@ export class CreateUserDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => normalizeEmail(value as string))
   @IsEmail({}, { message: "O e-mail fornecido é inválido." })
   email: string;
 

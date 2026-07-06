@@ -7,14 +7,16 @@ import { ConfigService } from "@nestjs/config";
 import { EmailService } from "../../shared/services/email.service";
 import { BadRequestException } from "@nestjs/common";
 import { User, SystemRole } from "@prisma/client";
+import { createHash } from "crypto";
 
 describe("Auth - Password Recovery", () => {
   let authService: AuthService;
   let authController: AuthController;
   let prismaService: PrismaService;
-  let jwtService: JwtService;
   let emailService: EmailService;
   let sendPasswordResetEmailSpy: jest.SpyInstance;
+  let findUniqueSpy: jest.SpyInstance;
+  let findFirstSpy: jest.SpyInstance;
   let updateSpy: jest.SpyInstance;
 
   const mockUser: User = {
@@ -24,12 +26,16 @@ describe("Auth - Password Recovery", () => {
     fullName_normalized: "test user",
     password: "mock_hashed_value", // eslint-disable-line sonarjs/no-hardcoded-passwords
     active: true,
-    gender: null,
     role: "PARTICIPANT" as SystemRole,
-    phone: null,
+    passwordResetToken: null,
+    passwordResetExpiresAt: null,
+    passwordResetUsedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
+
+  const hashToken = (token: string): string =>
+    createHash("sha256").update(token).digest("hex");
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -41,6 +47,7 @@ describe("Auth - Password Recovery", () => {
           useValue: {
             user: {
               findUnique: jest.fn(),
+              findFirst: jest.fn(),
               update: jest.fn(),
             },
           },
@@ -60,6 +67,11 @@ describe("Auth - Password Recovery", () => {
               if (key === "security") return { jwtSecret: "secret" };
               if (key === "email")
                 return { fromAddress: "a@a.com", fromName: "T" };
+              if (key === "passwordRecovery")
+                return {
+                  frontendBaseUrl: "http://localhost:3000",
+                  tokenExpiryMinutes: 15,
+                };
               return null;
             }),
             get: jest.fn((key: string) => {
@@ -80,45 +92,140 @@ describe("Auth - Password Recovery", () => {
     authService = module.get<AuthService>(AuthService);
     authController = module.get<AuthController>(AuthController);
     prismaService = module.get<PrismaService>(PrismaService);
-    jwtService = module.get<JwtService>(JwtService);
     emailService = module.get<EmailService>(EmailService);
     sendPasswordResetEmailSpy = jest.spyOn(
       emailService,
       "sendPasswordResetEmail",
     );
+    findUniqueSpy = jest.spyOn(prismaService.user, "findUnique");
+    findFirstSpy = jest.spyOn(prismaService.user, "findFirst");
     updateSpy = jest.spyOn(prismaService.user, "update");
   });
 
   describe("forgotPassword", () => {
-    it("should send email when user exists", async () => {
-      jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
-      jest.spyOn(jwtService, "signAsync").mockResolvedValue("token");
+    it("should send email with a 15 minute expiry when user exists", async () => {
+      findUniqueSpy.mockResolvedValue(mockUser);
+      updateSpy.mockResolvedValue(mockUser);
+
+      const before = Date.now();
+      await authService.forgotPassword(mockUser.email);
+      const after = Date.now();
+
+      expect(sendPasswordResetEmailSpy).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.fullName,
+        expect.stringContaining("/reset-password?token="),
+        15,
+      );
+
+      const updateArgs = (updateSpy.mock.calls[0] as unknown[])[0] as {
+        data: { passwordResetToken: string; passwordResetExpiresAt: Date };
+      };
+      const expiresAt = updateArgs.data.passwordResetExpiresAt.getTime();
+      expect(expiresAt).toBeGreaterThanOrEqual(before + 15 * 60 * 1000);
+      expect(expiresAt).toBeLessThanOrEqual(after + 15 * 60 * 1000);
+    });
+
+    it("should store a hashed token, never the raw token", async () => {
+      findUniqueSpy.mockResolvedValue(mockUser);
+      updateSpy.mockResolvedValue(mockUser);
 
       await authService.forgotPassword(mockUser.email);
 
-      expect(sendPasswordResetEmailSpy).toHaveBeenCalled();
+      const resetLink = (
+        sendPasswordResetEmailSpy.mock.calls[0] as unknown[]
+      )[2] as string;
+      const rawToken = decodeURIComponent(resetLink.split("token=")[1]);
+      const updateArgs = (updateSpy.mock.calls[0] as unknown[])[0] as {
+        data: { passwordResetToken: string };
+      };
+
+      expect(updateArgs.data.passwordResetToken).not.toBe(rawToken);
+      expect(updateArgs.data.passwordResetToken).toBe(hashToken(rawToken));
+    });
+
+    it("should normalize the email (trim + lowercase) before lookup", async () => {
+      findUniqueSpy.mockResolvedValue(mockUser);
+      updateSpy.mockResolvedValue(mockUser);
+
+      await authService.forgotPassword("  Test@Example.COM  ");
+
+      expect(findUniqueSpy).toHaveBeenCalledWith({
+        where: { email: "test@example.com" },
+      });
+    });
+
+    it("should do nothing when user does not exist", async () => {
+      findUniqueSpy.mockResolvedValue(null);
+
+      await authService.forgotPassword("none@example.com");
+
+      expect(sendPasswordResetEmailSpy).not.toHaveBeenCalled();
+      expect(updateSpy).not.toHaveBeenCalled();
     });
   });
 
   describe("resetPassword", () => {
-    it("should update password when token is valid", async () => {
-      jest.spyOn(jwtService, "decode").mockReturnValue({ sub: mockUser.id });
-      jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
-      jest
-        .spyOn(jwtService, "verifyAsync")
-        .mockResolvedValue({ sub: mockUser.id });
+    const rawToken = "raw-reset-token";
 
-      await authService.resetPassword("token", "NewPass123!");
+    it("should update password when token is valid and not expired", async () => {
+      findFirstSpy.mockResolvedValue({
+        ...mockUser,
+        passwordResetToken: hashToken(rawToken),
+        passwordResetExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        passwordResetUsedAt: null,
+      });
+      updateSpy.mockResolvedValue(mockUser);
 
-      expect(updateSpy).toHaveBeenCalled();
+      await authService.resetPassword(rawToken, "NewPass123!");
+
+      const updateArgs = (updateSpy.mock.calls[0] as unknown[])[0] as {
+        where: { id: string };
+        data: {
+          passwordResetToken: string | null;
+          passwordResetExpiresAt: Date | null;
+        };
+      };
+      expect(updateArgs.where.id).toBe(mockUser.id);
+      expect(updateArgs.data.passwordResetToken).toBeNull();
+      expect(updateArgs.data.passwordResetExpiresAt).toBeNull();
     });
 
-    it("should throw error on malformed token", async () => {
-      jest.spyOn(jwtService, "decode").mockReturnValue(null);
+    it("should reject an expired token (BUG-CT03)", async () => {
+      findFirstSpy.mockResolvedValue({
+        ...mockUser,
+        passwordResetToken: hashToken(rawToken),
+        passwordResetExpiresAt: new Date(Date.now() - 60 * 1000),
+        passwordResetUsedAt: null,
+      });
 
       await expect(
-        authService.resetPassword("bad", "Pass123!"),
+        authService.resetPassword(rawToken, "NewPass123!"),
+      ).rejects.toThrow(new BadRequestException("Token inválido ou expirado."));
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it("should reject a token that was already used", async () => {
+      findFirstSpy.mockResolvedValue({
+        ...mockUser,
+        passwordResetToken: hashToken(rawToken),
+        passwordResetExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        passwordResetUsedAt: new Date(),
+      });
+
+      await expect(
+        authService.resetPassword(rawToken, "NewPass123!"),
       ).rejects.toThrow(BadRequestException);
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it("should reject an unknown token", async () => {
+      findFirstSpy.mockResolvedValue(null);
+
+      await expect(
+        authService.resetPassword("bad-token", "NewPass123!"),
+      ).rejects.toThrow(BadRequestException);
+      expect(updateSpy).not.toHaveBeenCalled();
     });
   });
 

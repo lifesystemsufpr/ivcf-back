@@ -1,6 +1,9 @@
+import { Transform } from "class-transformer";
 import { IsEmail, IsNotEmpty, MinLength } from "class-validator";
+import { normalizeEmail } from "src/shared/functions/normalize-email";
 
 export class ForgotPasswordDto {
+  @Transform(({ value }) => normalizeEmail(value as string))
   @IsEmail()
   @IsNotEmpty()
   email: string;

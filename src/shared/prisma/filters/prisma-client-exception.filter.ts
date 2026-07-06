@@ -22,9 +22,10 @@ export class PrismaClientExceptionFilter extends BaseExceptionFilter {
       const target = prismaError.meta?.target;
 
       if (prismaError.code === "P2002") {
-        const message = Array.isArray(target)
-          ? `Unique constraint failed on the fields: ${target.join(", ")}`
-          : "Unique constraint failed";
+        const targets = Array.isArray(target) ? target : [target];
+        const message = targets.includes("email")
+          ? "Este e-mail já está cadastrado no sistema."
+          : "Já existe um registro com esses dados no sistema.";
 
         response.status(status).json({
           statusCode: status,

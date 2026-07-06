@@ -21,6 +21,7 @@ import {
 } from "src/shared/config/config.interface";
 import { EmailService } from "src/shared/services/email.service";
 import { createHash, randomBytes } from "crypto";
+import { normalizeEmail } from "src/shared/functions/normalize-email";
 
 @Injectable()
 export class AuthService {
@@ -39,7 +40,7 @@ export class AuthService {
   ): Promise<Partial<User> | null> {
     try {
       const user = await this.prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizeEmail(email) },
         select: {
           id: true,
           fullName: true,
@@ -162,7 +163,7 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizeEmail(email) },
     });
 
     if (!user) {
@@ -170,9 +171,7 @@ export class AuthService {
     }
 
     const passwordRecoveryConfig =
-      this.configService.getOrThrow<PasswordRecoveryConfig>(
-        "passwordRecovery",
-      );
+      this.configService.getOrThrow<PasswordRecoveryConfig>("passwordRecovery");
 
     const resetToken = this.generateResetToken();
     const resetTokenHash = this.hashResetToken(resetToken);
@@ -209,7 +208,10 @@ export class AuthService {
       throw new BadRequestException("Token inválido ou expirado.");
     }
 
-    if (!user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
+    if (
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt < new Date()
+    ) {
       throw new BadRequestException("Token inválido ou expirado.");
     }
 

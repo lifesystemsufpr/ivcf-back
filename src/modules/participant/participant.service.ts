@@ -18,6 +18,7 @@ import {
   SortDirection,
 } from "./dto/find-participant-query.dto";
 import { normalizeString } from "src/shared/functions/normalize-string";
+import { normalizeEmail } from "src/shared/functions/normalize-email";
 
 type ParticipantWithUser = Participant & { user: User };
 export type ParticipantResponse = Omit<ParticipantWithUser, "user"> &
@@ -568,7 +569,7 @@ export class ParticipantService extends BaseService<
     email: string,
   ): Promise<{ userId: string; participantId: string | undefined }> {
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizeEmail(email) },
       select: {
         id: true,
         participant: {
