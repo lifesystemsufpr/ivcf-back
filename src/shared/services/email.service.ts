@@ -39,7 +39,7 @@ export class EmailService {
       const mailOptions = {
         from: `"${emailConfig.fromName}" <${emailConfig.fromAddress}>`,
         to: email,
-        subject: "Recuperação de Senha - TecnoAging",
+        subject: "Recuperação de Senha - Life Systems",
         html: this.getPasswordResetEmailTemplate(
           fullName,
           resetLink,
@@ -84,7 +84,7 @@ export class EmailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>TecnoAging - Recuperação de Senha</h1>
+            <h1>Life Systems - Recuperação de Senha</h1>
           </div>
           <div class="content">
             <p>Olá <strong>${fullName}</strong>,</p>
@@ -100,7 +100,7 @@ export class EmailService {
             </div>
           </div>
           <div class="footer">
-            <p>© ${new Date().getFullYear()} TecnoAging. Todos os direitos reservados.</p>
+            <p>© ${new Date().getFullYear()} Life Systems. Todos os direitos reservados.</p>
           </div>
         </div>
       </body>

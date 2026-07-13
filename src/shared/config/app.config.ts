@@ -58,7 +58,7 @@ export default () => {
     smtpUser: process.env.SMTP_USER || "",
     smtpPassword: process.env.SMTP_PASSWORD || "",
     fromAddress: process.env.SMTP_FROM || "noreply@tecnoaging.com",
-    fromName: process.env.SMTP_FROM_NAME || "TecnoAging",
+    fromName: process.env.SMTP_FROM_NAME || "Life Systems",
   };
 
   const appConfig: AppConfig = {
