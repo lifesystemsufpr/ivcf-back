@@ -12,6 +12,7 @@ import type { Response } from "express";
 import { QuestionnaireService } from "./questionnaire.service";
 import { CreateResponseDto } from "./dto/create-response.dto";
 import { FilterQuestionnaireResponseDto } from "./dto/filter-questionnaire-response.dto";
+import { FilterParticipantDto } from "./dto/filter-participant.dto";
 import { FragilityDashboardQueryDto } from "./dto/fragility-dashboard.dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { SystemRole } from "@prisma/client";
@@ -51,8 +52,11 @@ export class QuestionnaireController {
   }
 
   @Get("participant/:participantId")
-  getByParticipant(@Param("participantId") id: string) {
-    return this.service.findAllByParticipant(id);
+  getByParticipant(
+    @Param("participantId") id: string,
+    @Query() query: FilterParticipantDto,
+  ) {
+    return this.service.findAllByParticipant(id, query);
   }
 
   @Get("participant/:participantId/evolution")

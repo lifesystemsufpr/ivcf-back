@@ -6,6 +6,7 @@ import {
 import { CreateResponseDto } from "./dto/create-response.dto";
 import { PrismaService } from "src/shared/prisma/prisma.service";
 import { FilterQuestionnaireResponseDto } from "./dto/filter-questionnaire-response.dto";
+import { FilterParticipantDto } from "./dto/filter-participant.dto";
 import { Gender, Prisma } from "@prisma/client";
 import { normalizeString } from "src/shared/functions/normalize-string";
 import { FragilityDashboardQueryDto } from "./dto/fragility-dashboard.dto";
@@ -543,9 +544,34 @@ export class QuestionnaireService {
     };
   }
 
-  async findAllByParticipant(participantId: string) {
+  async findAllByParticipant(
+    participantId: string,
+    filters?: FilterParticipantDto,
+  ) {
+    const { classification, startDate, endDate } = filters || {};
+
+    const conditions: Prisma.QuestionnaireResponseWhereInput[] = [
+      { participantId },
+    ];
+
+    if (classification && classification !== "Todos") {
+      const matchingLabels = this.getMatchingClassificationLabels(classification);
+      conditions.push({ classification: { in: matchingLabels } });
+    }
+
+    if (startDate || endDate) {
+      const dateFilter: Prisma.DateTimeFilter = {};
+      if (startDate) dateFilter.gte = startDate;
+      if (endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+        dateFilter.lte = endOfDay;
+      }
+      conditions.push({ date: dateFilter });
+    }
+
     return await this.prisma.questionnaireResponse.findMany({
-      where: { participantId },
+      where: { AND: conditions },
       orderBy: { date: "desc" },
       include: {
         healthProfessional: {
@@ -560,6 +586,20 @@ export class QuestionnaireService {
         },
       },
     });
+  }
+
+  private getMatchingClassificationLabels(filterValue: string): string[] {
+    if (filterValue === "Em Risco de Fragilização") {
+      filterValue = QuestionnaireService.FRAILTY_LABELS.preFrail;
+    }
+
+    const legacyMatches = Object.entries(
+      QuestionnaireService.LEGACY_FRAILTY_LABELS,
+    )
+      .filter(([, current]) => current === filterValue)
+      .map(([legacy]) => legacy);
+
+    return [filterValue, ...legacyMatches];
   }
 
   async findOneResponse(responseId: string) {

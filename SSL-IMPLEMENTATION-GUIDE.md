@@ -1,6 +1,6 @@
-# Guia de Implementação SSL para TecnoAging API
+# Guia de Implementação SSL para Life Systems API
 
-Este guia fornece instruções completas para implementar SSL/TLS no projeto TecnoAging API na VM da Azure.
+Este guia fornece instruções completas para implementar SSL/TLS no projeto Life Systems API na VM da Azure.
 
 ## 🚀 Implementação Rápida
 
@@ -8,7 +8,7 @@ Este guia fornece instruções completas para implementar SSL/TLS no projeto Tec
 - VM na Azure com Ubuntu 20.04+
 - Domínio apontando para o IP da VM (20.201.114.238)
 - Acesso SSH à VM
-- Projeto TecnoAging API rodando na VM
+- Projeto Life Systems API rodando na VM
 
 ### Passo 1: Conectar à VM
 ```bash
@@ -279,4 +279,4 @@ Se encontrar problemas durante a implementação:
 
 ---
 
-**Nota**: Este guia assume que você tem acesso SSH à VM e que o projeto TecnoAging API já está rodando. Certifique-se de substituir `seu-dominio.com` pelo seu domínio real em todos os comandos.
+**Nota**: Este guia assume que você tem acesso SSH à VM e que o projeto Life Systems API já está rodando. Certifique-se de substituir `seu-dominio.com` pelo seu domínio real em todos os comandos.
