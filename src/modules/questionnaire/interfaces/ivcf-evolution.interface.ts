@@ -183,6 +183,26 @@ export interface CurrentMonthStatsResponse {
   female: number;
 }
 
+export interface ClassifiedParticipantSummary {
+  participantId: string;
+  participantName: string;
+  age: number;
+  healthProfessionalName: string;
+  score: number;
+  classification: string;
+  date: string;
+}
+
+export interface ClassifiedParticipantsResponse {
+  data: ClassifiedParticipantSummary[];
+  meta: {
+    total: number;
+    page: number;
+    pageSize: number;
+    lastPage: number;
+  };
+}
+
 export type FragilityAssessmentRow = {
   id: string;
   participantId: string;
