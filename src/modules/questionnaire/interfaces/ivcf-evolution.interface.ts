@@ -147,6 +147,7 @@ export interface FragilityDashboardResponse {
       data: Array<{
         x: number;
         y: number;
+        participantId: string;
         age: number;
         sex: string;
         riskLevel: string;

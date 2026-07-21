@@ -1160,6 +1160,7 @@ export class QuestionnaireService {
   private async buildDashboardFromAssessments(
     assessments: Array<{
       id: string;
+      participantId: string;
       age: number;
       sex: "M" | "F" | null;
       score: number;
@@ -1301,6 +1302,7 @@ export class QuestionnaireService {
           .map((a) => ({
             x: a.age,
             y: Number(a.score.toFixed(1)),
+            participantId: a.participantId,
             age: a.age,
             sex: "M",
             riskLevel: a.riskLevel,
@@ -1314,6 +1316,7 @@ export class QuestionnaireService {
           .map((a) => ({
             x: a.age,
             y: Number(a.score.toFixed(1)),
+            participantId: a.participantId,
             age: a.age,
             sex: "F",
             riskLevel: a.riskLevel,
