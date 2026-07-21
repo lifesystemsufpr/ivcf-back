@@ -209,6 +209,7 @@ model QuestionnaireResponse {
 
   @@index([participantId])
   @@index([healthProfessionalId])
+  @@index([classification])
   @@map("questionnaire_response")
 }
 
