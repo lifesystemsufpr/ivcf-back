@@ -1,0 +1,352 @@
+<title>DER — Históricos & Notificações (IVCF)</title>
+<style>
+  /* Página deliberadamente dark-only: o fluxograma de referência do projeto é dark. */
+  :root, :root[data-theme="light"], :root[data-theme="dark"] {
+    --bg: #0d1214;
+    --bg-raise: #131a1d;
+    --surface: #182226;
+    --ink: #e9eef0;
+    --ink-soft: #a7b6bb;
+    --ink-faint: #64757c;
+    --line: #243035;
+    --accent: #34c4b3;
+    --accent-soft: rgba(52,196,179,.14);
+    --violet: #c792ea;
+    --rose: #f78c9c;
+    --amber: #e0993f;
+    --danger: #e06c75;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 48px 24px 72px; }
+
+  header { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 32px; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: clamp(26px, 4vw, 38px); line-height: 1.12; margin: 0 0 10px; text-wrap: balance; font-weight: 650; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-soft); max-width: 64ch; margin: 0; font-size: 15.5px; }
+
+  h2 {
+    font-size: 13px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-faint); font-family: ui-monospace, Menlo, monospace;
+    margin: 44px 0 16px; font-weight: 600;
+  }
+
+  .decision {
+    background: linear-gradient(180deg, var(--accent-soft), transparent 140%);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+    border-radius: 12px; padding: 20px 22px; margin: 28px 0 8px;
+  }
+  .decision .badge {
+    display: inline-block; font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: #0d1214; background: var(--accent); border-radius: 6px; padding: 3px 9px; margin-bottom: 10px;
+  }
+  .decision h3 { margin: 0 0 8px; font-size: 18px; font-weight: 640; }
+  .decision p { margin: 8px 0 0; font-size: 14.5px; color: var(--ink-soft); max-width: 78ch; }
+  .decision p b, .step .t b { color: var(--ink); font-weight: 620; }
+
+  .why { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 16px; }
+  .why div {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 13px 15px; font-size: 13.5px; color: var(--ink-soft);
+  }
+  .why div b { display: block; color: var(--ink); font-weight: 620; margin-bottom: 3px; font-size: 14px; }
+
+  .diagram-card {
+    background: var(--bg-raise);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 18px 0 8px;
+    overflow-x: auto;
+  }
+  .diagram-card pre.mermaid { margin: 0; min-width: 720px; text-align: center; background: transparent; line-height: normal; }
+  /* O reset global (box-sizing/line-height) corta os rótulos que o mermaid mede
+     com as métricas próprias dele — restaura o padrão dentro dos diagramas. */
+  .diagram-card pre.mermaid * { box-sizing: content-box; }
+  .diagram-card pre.mermaid span,
+  .diagram-card pre.mermaid p,
+  .diagram-card pre.mermaid div { line-height: 1.25; }
+  .diagram-card svg { max-width: 100%; height: auto; }
+  .caption { font-size: 12.5px; color: var(--ink-faint); font-family: ui-monospace, Menlo, monospace; margin: 8px 2px 0; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .92em;
+    background: var(--accent-soft); color: var(--ink); padding: 1px 5px; border-radius: 4px;
+  }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; position: relative;
+  }
+  .card::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 3px; }
+  .card.new::before { background: var(--accent); }
+  .card.alt::before { background: var(--amber); }
+  .card.del::before { background: var(--danger); }
+  .card h3 { margin: 0 0 4px; font-size: 15.5px; font-weight: 620; font-family: ui-monospace, Menlo, monospace; letter-spacing: -0.01em; }
+  .tag {
+    font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700;
+    padding: 2px 7px; border-radius: 5px; margin-left: 8px; vertical-align: 1px;
+  }
+  .card.new .tag { background: var(--accent-soft); color: var(--accent); }
+  .card.alt .tag { background: rgba(224,153,63,.15); color: var(--amber); }
+  .card.del .tag { background: rgba(224,108,117,.15); color: var(--danger); }
+  .card p { margin: 6px 0 0; font-size: 14px; color: var(--ink-soft); }
+  .card ul { margin: 8px 0 0; padding-left: 16px; font-size: 13.5px; color: var(--ink-soft); }
+  .card ul li { margin: 3px 0; }
+
+  footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 12.5px; font-family: ui-monospace, Menlo, monospace; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">IVCF · Modelo de dados · v2</p>
+    <h1>Históricos independentes &amp; notificações</h1>
+    <p class="sub">Redesenho do domínio: múltiplos históricos por participante, isolados por profissional (dono), com fluxo de solicitação → aprovação → cópia de base histórica e notificações.</p>
+  </header>
+
+  <div class="decision">
+    <span class="badge">Decisão de arquitetura</span>
+    <h3>HistoricoBase substitui a tabela de vínculo HealthProfessionalParticipant</h3>
+    <p>Hoje o vínculo profissional↔participante vive em <code>health_professional_participant</code>, com grão <code>(healthProfessionalId, participantId)</code> — <b>exatamente o mesmo grão</b> da nova <code>HistoricoBase</code>. Manter as duas criaria duas fontes de verdade para "quem atende quem", que inevitavelmente divergem. A <code>HistoricoBase</code> passa a ser <b>o próprio vínculo</b>, enriquecido: além de ligar as partes, carrega a origem do histórico (<code>FROM_SCRATCH</code> / <code>COPIED</code>), o estado (<code>active</code>) e agrupa as respostas de questionário do dono.</p>
+    <div class="why">
+      <div><b>Uma fonte de verdade</b>"Quais profissionais têm histórico ativo com o participante X?" responde-se numa única query indexada em <code>historico_base(participantId)</code> — o requisito de performance do fluxo de notificação.</div>
+      <div><b>Migração segura</b>Backfill direto: cada linha do vínculo atual vira uma <code>HistoricoBase(origin=FROM_SCRATCH)</code>, e as respostas existentes religam-se pela dupla (participante, profissional aplicador). Sem perda.</div>
+      <div><b>Sem semântica torta</b>A alternativa (evoluir a tabela de vínculo com campos de histórico) deixaria um nome que não comunica o papel de container de evolução clínica. O fluxo inteiro gira em torno do conceito de "base histórica" — o modelo deve dizer isso.</div>
+    </div>
+  </div>
+
+  <h2>Fluxograma — cadastro &amp; compartilhamento</h2>
+  <div class="diagram-card">
+    <pre class="mermaid">
+%%{init: {'theme':'dark','themeVariables':{'darkMode':true,'background':'#131a1d','primaryColor':'#182226','primaryTextColor':'#e9eef0','primaryBorderColor':'#34c4b3','lineColor':'#64757c','clusterBkg':'#131a1d','clusterBorder':'#243035','edgeLabelBackground':'#131a1d'}}}%%
+flowchart TD
+    A["Profissional X<br/>cria participante"] --> B{"Participante<br/>já existe?"}
+    B -- "não" --> C["Fluxo padrão:<br/>cria User + Participant"]
+    C --> D["Cria HistoricoBase<br/>origin = FROM_SCRATCH"]
+    B -- "sim" --> E["Sistema alerta a existência"]
+    E --> F{"Como iniciar<br/>o histórico?"}
+    F -- "criar do zero" --> D
+    D --> G(["Sem histórico herdado<br/>base vazia do profissional X"])
+    F -- "usar base de outro" --> H["Sistema lista profissionais com<br/>HistoricoBase ativa do participante<br/><i>query única indexada</i>"]
+    H --> I["Profissional X escolhe<br/>quais bases quer (1..N)"]
+    I --> J["Para cada dono escolhido:<br/>ShareRequest status = PENDING<br/>snapshotAt = agora"]
+    J --> K["Notification → dono:<br/>SHARE_REQUEST_RECEIVED"]
+    K --> L{"Dono responde"}
+    L -- "recusa" --> M["ShareRequest → REJECTED"]
+    M --> N(["Notification → solicitante:<br/>recusado, nada é copiado"])
+    L -- "aprova" --> O["ShareRequest → APPROVED"]
+    O --> P["Sistema copia respostas com<br/>date ≤ snapshotAt para nova<br/>HistoricoBase origin = COPIED<br/><i>linhagem via sourceResponseId</i>"]
+    P --> Q(["Notification → solicitante:<br/>aprovado, cópia disponível<br/>evolução segue independente"])
+
+    style B fill:#182226,stroke:#c792ea,color:#e9eef0
+    style F fill:#182226,stroke:#c792ea,color:#e9eef0
+    style L fill:#182226,stroke:#c792ea,color:#e9eef0
+    style G fill:#14312e,stroke:#34c4b3,color:#e9eef0
+    style Q fill:#14312e,stroke:#34c4b3,color:#e9eef0
+    style N fill:#2b1a1e,stroke:#f78c9c,color:#e9eef0
+    style M fill:#2b1a1e,stroke:#f78c9c,color:#e9eef0
+    style J fill:#182226,stroke:#e0993f,color:#e9eef0
+    style K fill:#182226,stroke:#e0993f,color:#e9eef0
+    </pre>
+  </div>
+  <p class="caption">losangos = decisões · verde = fim feliz · rosa = recusa · âmbar = transição/notificação</p>
+
+  <h2>DER — modelo alvo</h2>
+  <div class="diagram-card">
+    <pre class="mermaid">
+%%{init: {'theme':'dark','themeVariables':{'darkMode':true,'primaryColor':'#182226','primaryTextColor':'#e9eef0','primaryBorderColor':'#34c4b3','lineColor':'#64757c'}}}%%
+erDiagram
+    User ||--o| Participant : "é"
+    User ||--o| HealthProfessional : "é"
+    User ||--o{ Notification : "recebe"
+    Participant ||--o{ HistoricoBase : "possui"
+    HealthProfessional ||--o{ HistoricoBase : "dono de"
+    HistoricoBase ||--o{ QuestionnaireResponse : "agrupa"
+    HealthProfessional ||--o{ QuestionnaireResponse : "aplicou"
+    Questionnaire ||--o{ QuestionnaireResponse : "instrumento"
+    QuestionnaireResponse ||--o{ Answer : "contém"
+    Participant ||--o{ ShareRequest : "sobre"
+    HealthProfessional ||--o{ ShareRequest : "solicita"
+    HealthProfessional ||--o{ ShareRequest : "aprova"
+    HistoricoBase ||--o{ ShareRequest : "origem"
+    HistoricoBase ||--o{ ShareRequest : "destino"
+    ShareRequest ||--o{ Notification : "dispara"
+
+    User {
+        string id PK
+        string email UK
+        enum role
+    }
+    Participant {
+        string id PK
+        date birthday
+        enum gender
+        boolean active
+    }
+    HealthProfessional {
+        string id PK
+        string speciality
+        boolean active
+    }
+    HistoricoBase {
+        string id PK
+        string participantId FK
+        string ownerProfessionalId FK
+        enum origin
+        boolean active
+    }
+    QuestionnaireResponse {
+        string id PK
+        string historicoBaseId FK
+        string appliedByProfessionalId FK
+        string questionnaireId FK
+        string sourceResponseId FK
+        int totalScore
+        datetime date
+    }
+    Answer {
+        string id PK
+        string questionnaireResponseId FK
+        string questionId FK
+    }
+    ShareRequest {
+        string id PK
+        string participantId FK
+        string requesterProfessionalId FK
+        string ownerProfessionalId FK
+        string sourceHistoricoBaseId FK
+        string targetHistoricoBaseId FK
+        enum status
+        datetime snapshotAt
+    }
+    Notification {
+        string id PK
+        string recipientUserId FK
+        enum type
+        string shareRequestId FK
+        datetime readAt
+    }
+    Questionnaire {
+        string id PK
+        string slug UK
+    }
+    </pre>
+  </div>
+  <p class="caption">historico_base: @@unique([participantId, ownerProfessionalId]) · @@index([participantId]) — health_professional_participant é removida (substituída)</p>
+
+  <h2>Mudanças no schema</h2>
+  <div class="cards">
+    <div class="card new">
+      <h3>HistoricoBase<span class="tag">nova</span></h3>
+      <p>Vínculo + container de evolução por dono. Substitui a tabela de vínculo atual.</p>
+      <ul>
+        <li><code>@@unique([participantId, ownerProfessionalId])</code></li>
+        <li><code>@@index([participantId])</code> → lista donos ativos em 1 query</li>
+        <li><code>origin</code>: <code>FROM_SCRATCH</code> | <code>COPIED</code></li>
+      </ul>
+    </div>
+    <div class="card alt">
+      <h3>QuestionnaireResponse<span class="tag">alterada</span></h3>
+      <p>Passa a pertencer a uma base; autoria e linhagem preservadas.</p>
+      <ul>
+        <li>+ <code>historicoBaseId</code> (grupo primário)</li>
+        <li><code>healthProfessionalId</code> → <code>appliedByProfessionalId</code></li>
+        <li>+ <code>sourceResponseId?</code> — cópias apontam a original; <b>análises populacionais filtram <code>sourceResponseId IS NULL</code></b> para não contar duplicado</li>
+      </ul>
+    </div>
+    <div class="card new">
+      <h3>ShareRequest<span class="tag">nova</span></h3>
+      <p>Transição do opt-in: solicitação → aprovação/recusa, com corte temporal.</p>
+      <ul>
+        <li><code>snapshotAt</code> congela o alcance da cópia no momento do pedido</li>
+        <li><code>@@index([ownerProfessionalId, status])</code> → pendências do dono</li>
+      </ul>
+    </div>
+    <div class="card new">
+      <h3>Notification<span class="tag">nova</span></h3>
+      <p>Genérica e reutilizável: destinatário, tipo, lida/não-lida, ponteiro para a entidade que a gerou.</p>
+      <ul>
+        <li><code>@@index([recipientUserId, readAt])</code></li>
+      </ul>
+    </div>
+    <div class="card del">
+      <h3>HealthProfessionalParticipant<span class="tag">removida</span></h3>
+      <p>Mesmo grão da <code>HistoricoBase</code> — seria fonte de verdade duplicada. Backfill: cada linha vira uma base <code>FROM_SCRATCH</code>; services que usam <code>participantsLinks</code> passam a consultar as bases.</p>
+    </div>
+  </div>
+
+  <h2>Instituições &amp; multitenancy — decisão para saúde pública</h2>
+  <div class="decision">
+    <span class="badge">Decisão</span>
+    <h3>Espaço de dados único + HealthUnit como cadastro (CNES) — sem tenant</h3>
+    <p>O destino do sistema é a <b>rede pública (SUS)</b>, num projeto da UF. Nesse contexto o idoso circula entre serviços (UBS, ambulatório, hospital) e o IVCF-20 é aplicado por equipe multiprofissional — fisioterapeutas, enfermagem, medicina. O valor do fluxo de compartilhamento é justamente a <b>coordenação do cuidado entre unidades</b>: um muro de tenant por instituição quebraria a descoberta de bases no melhor caso de uso. O cidadão é um só — registro de participante único e global na instância. A estrutura administrativa da rede entra como <b>dimensão de análise</b>, não como fronteira de dados.</p>
+    <div class="why">
+      <div><b>HealthUnit (referência)</b>Estabelecimento de saúde com nome, tipo e <b>código CNES</b> (identificador oficial SUS — interoperabilidade de graça). <code>HealthProfessional.healthUnitId</code> FK opcional; <code>Researcher.institutionId</code> promovida de string solta a FK real.</div>
+      <div><b>Ganho no fluxo</b>Na escolha de bases, o solicitante vê <i>"Dra. Fulana — Fisioterapia — UBS Boa Vista"</i>: especialidade (campo já existente) + unidade tornam a decisão informada.</div>
+      <div><b>Ganho na gestão/pesquisa</b>Dashboards por unidade/tipo/região: fragilidade média por UBS, aplicações por estabelecimento — o que secretaria e pesquisadores da UF vão pedir.</div>
+      <div><b>Tenant: só se multi-município</b>Se o projeto virar plataforma para vários municípios com exigência de segregação administrativa, a <code>HealthUnit</code> evolui para baixo de uma <code>Organization</code> (secretaria) com coluna discriminadora + RLS. Caminho documentado, custo zero agora.</div>
+    </div>
+  </div>
+
+  <div class="diagram-card">
+    <pre class="mermaid">
+%%{init: {'theme':'dark','themeVariables':{'darkMode':true,'primaryColor':'#182226','primaryTextColor':'#e9eef0','primaryBorderColor':'#c792ea','lineColor':'#64757c'}}}%%
+erDiagram
+    HealthUnit ||--o{ HealthProfessional : "lota"
+    HealthUnit ||--o{ Researcher : "vincula"
+    User ||--o| Participant : "é"
+    User ||--o| HealthProfessional : "é"
+    User ||--o| Researcher : "é"
+    HealthProfessional ||--o{ HistoricoBase : "dono de"
+    Participant ||--o{ HistoricoBase : "possui"
+
+    HealthUnit {
+        string id PK
+        string name
+        string cnesCode UK
+        string type
+        string city
+        string state
+        boolean active
+    }
+    HealthProfessional {
+        string id PK
+        string healthUnitId FK
+        string speciality
+    }
+    Researcher {
+        string id PK
+        string institutionId FK
+    }
+    Participant {
+        string id PK
+        enum gender
+    }
+    HistoricoBase {
+        string id PK
+        string participantId FK
+        string ownerProfessionalId FK
+    }
+    </pre>
+  </div>
+  <p class="caption">roxo = camada de estabelecimentos (referência, não isolamento) · cnesCode = Cadastro Nacional de Estabelecimentos de Saúde · participante permanece global (cidadão único)</p>
+
+  <footer>ivcf-api · prisma/schema.prisma · decisão registrada — próximo passo: doc de design + schema</footer>
+</div>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true });
+</script>

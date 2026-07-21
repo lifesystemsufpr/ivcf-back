@@ -24,6 +24,7 @@ model User {
   healthProfessional HealthProfessional?
   participant        Participant?
   researcher         Researcher?
+  notifications      Notification[]
 
   @@index([fullName_normalized])
   @@map("user")
@@ -38,10 +39,33 @@ model Researcher {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  user        User        @relation(fields: [id], references: [id])
+  user        User       @relation(fields: [id], references: [id])
+  institution HealthUnit @relation(fields: [institutionId], references: [id])
 
   @@index([institutionId])
   @@map("researcher")
+}
+
+/// Estabelecimento de saúde/pesquisa (referência, não isolamento).
+/// cnesCode = Cadastro Nacional de Estabelecimentos de Saúde (SUS).
+model HealthUnit {
+  id              String  @id @default(uuid())
+  name            String
+  name_normalized String  @default("") @db.Text
+  cnesCode        String? @unique
+  type            String?
+  city            String?
+  state           String?
+  active          Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  professionals HealthProfessional[]
+  researchers   Researcher[]
+
+  @@index([name_normalized])
+  @@map("health_unit")
 }
 
 model HealthProfessional {
@@ -50,13 +74,19 @@ model HealthProfessional {
   speciality            String
   speciality_normalized String  @default("") @db.Text
 
+  /// Lotação (opcional para não travar cadastro).
+  healthUnitId String?
+  healthUnit   HealthUnit? @relation(fields: [healthUnitId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
   appliedQuestionnaires QuestionnaireResponse[]
   user                  User @relation(fields: [id], references: [id])
 
-  participantsLinks HealthProfessionalParticipant[]
+  historicoBases         HistoricoBase[]
+  shareRequestsMade      ShareRequest[] @relation("ShareRequestRequester")
+  shareRequestsReceived  ShareRequest[] @relation("ShareRequestOwner")
 
   @@index([speciality])
   @@index([speciality_normalized])
@@ -85,23 +115,97 @@ model Participant {
   questionnaireResponses QuestionnaireResponse[]
   user                   User @relation(fields: [id], references: [id])
 
-  healthProfessionalsLinks HealthProfessionalParticipant[]
+  historicoBases HistoricoBase[]
+  shareRequests  ShareRequest[]
 
   @@map("participant")
 }
 
-model HealthProfessionalParticipant {
-  healthProfessionalId String
-  participantId        String
+/// Vínculo profissional↔participante + container do histórico do dono.
+/// Substitui a antiga HealthProfessionalParticipant (mesmo grão).
+model HistoricoBase {
+  id String @id @default(uuid())
+
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  ownerProfessionalId String
+  ownerProfessional   HealthProfessional @relation(fields: [ownerProfessionalId], references: [id], onDelete: Cascade)
+
+  origin HistoricoOrigin @default(FROM_SCRATCH)
+  active Boolean         @default(true)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-  healthProfessional HealthProfessional @relation(fields: [healthProfessionalId], references: [id], onDelete: Cascade)
-  participant        Participant        @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  responses             QuestionnaireResponse[]
+  shareRequestsAsSource ShareRequest[]          @relation("ShareRequestSource")
+  shareRequestsAsTarget ShareRequest[]          @relation("ShareRequestTarget")
 
-  @@id([healthProfessionalId, participantId])
+  @@unique([participantId, ownerProfessionalId])
+  @@index([ownerProfessionalId])
+  @@map("historico_base")
+}
+
+/// Solicitação de cópia de base histórica (opt-in do fluxograma).
+/// Invariante de aplicação: no máximo uma PENDING por (requester, source).
+model ShareRequest {
+  id String @id @default(uuid())
+
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  requesterProfessionalId String
+  requesterProfessional   HealthProfessional @relation("ShareRequestRequester", fields: [requesterProfessionalId], references: [id], onDelete: Cascade)
+
+  ownerProfessionalId String
+  ownerProfessional   HealthProfessional @relation("ShareRequestOwner", fields: [ownerProfessionalId], references: [id], onDelete: Cascade)
+
+  sourceHistoricoBaseId String
+  sourceHistoricoBase   HistoricoBase @relation("ShareRequestSource", fields: [sourceHistoricoBaseId], references: [id], onDelete: Cascade)
+
+  /// Base criada para o solicitante quando o pedido é aprovado.
+  targetHistoricoBaseId String?
+  targetHistoricoBase   HistoricoBase? @relation("ShareRequestTarget", fields: [targetHistoricoBaseId], references: [id])
+
+  status ShareRequestStatus @default(PENDING)
+
+  /// Corte temporal da cópia: só respostas com date <= snapshotAt são copiadas.
+  snapshotAt  DateTime
+  requestedAt DateTime  @default(now())
+  respondedAt DateTime?
+
+  notifications Notification[]
+
+  @@index([ownerProfessionalId, status])
+  @@index([requesterProfessionalId, status])
   @@index([participantId])
-  @@map("health_professional_participant")
+  @@map("share_request")
+}
+
+model Notification {
+  id String @id @default(uuid())
+
+  recipientUserId String
+  recipient       User @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  type  NotificationType
+  title String
+  body  String?          @db.Text
+
+  /// Ponteiro genérico para a entidade que originou a notificação.
+  entityType String?
+  entityId   String?
+
+  shareRequestId String?
+  shareRequest   ShareRequest? @relation(fields: [shareRequestId], references: [id], onDelete: SetNull)
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([recipientUserId, readAt])
+  @@index([recipientUserId, createdAt])
+  @@map("notification")
 }
 
 model Questionnaire {
@@ -193,22 +297,36 @@ model QuestionnaireResponse {
   classification String?
   date           DateTime @default(now())
 
+  /// Base histórica a que a resposta pertence (agrupamento primário).
+  historicoBaseId String
+  historicoBase   HistoricoBase @relation(fields: [historicoBaseId], references: [id], onDelete: Cascade)
+
+  /// Denormalizado (= historicoBase.participantId) para dashboards/pesquisa.
   participantId String
   participant   Participant @relation(fields: [participantId], references: [id])
 
-  healthProfessionalId String
-  healthProfessional   HealthProfessional @relation(fields: [healthProfessionalId], references: [id])
+  /// Autoria original — numa cópia, difere do dono da base.
+  appliedByProfessionalId String
+  appliedByProfessional   HealthProfessional @relation(fields: [appliedByProfessionalId], references: [id])
 
   questionnaireId String
   questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id])
+
+  /// Linhagem: cópias apontam a resposta original. Análises populacionais
+  /// devem filtrar sourceResponseId IS NULL para não contar duplicado.
+  sourceResponseId String?
+  sourceResponse   QuestionnaireResponse?  @relation("ResponseLineage", fields: [sourceResponseId], references: [id])
+  copies           QuestionnaireResponse[] @relation("ResponseLineage")
 
   answers Answer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([historicoBaseId])
   @@index([participantId])
-  @@index([healthProfessionalId])
+  @@index([appliedByProfessionalId])
+  @@index([sourceResponseId])
   @@map("questionnaire_response")
 }
 
@@ -249,4 +367,23 @@ enum Gender {
   MALE
   FEMALE
   OTHER
+}
+
+enum HistoricoOrigin {
+  FROM_SCRATCH
+  COPIED
+}
+
+enum ShareRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  SHARE_REQUEST_RECEIVED
+  SHARE_REQUEST_APPROVED
+  SHARE_REQUEST_REJECTED
+  SYSTEM
 }
