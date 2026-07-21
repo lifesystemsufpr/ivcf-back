@@ -93,6 +93,19 @@ Hoje `QuestionnaireResponse` liga participante ↔ profissional ↔ questionári
 - Endpoints do fluxo de solicitação/aprovação e de leitura de notificações.
 - Detecção de duplicidade no cadastro ("já existe?") — hoje inexistente; exigirá critério (e-mail/CPF).
 
+## Sugestão: Multitenancy (fora de escopo, recomendação)
+
+**Diagnóstico:** o sistema hoje **não é multitenant**. Não há entidade de tenant; `Researcher.institutionId` é uma string sem FK e não escopa nada. Instituições diferentes na mesma instância compartilham o espaço de dados — e a listagem de "profissionais com base ativa" do fluxo de compartilhamento atravessaria instituições sem controle.
+
+**Recomendação (quando for priorizado):** banco e schema compartilhados com **coluna discriminadora** `organizationId` — estratégia padrão para o porte do projeto; RLS do Postgres como endurecimento posterior.
+
+- Nova `Organization` (`id`, `name`, `slug @unique`, `active`).
+- `User.organizationId` FK obrigatória; `Participant`/`HealthProfessional`/`Researcher` herdam o escopo via `User` (id compartilhado). `Researcher.institutionId` promovida a FK para `Organization`.
+- `organizationId` **denormalizado** em `HistoricoBase`, `ShareRequest` e `Notification`, com índices compostos (`@@index([organizationId, ...])`), para que as queries do fluxo nasçam filtradas por tenant sem join até `User`.
+- **Decisão de produto pendente:** compartilhamento de base entre instituições. Sugestão: mesmo tenant por padrão (service valida requester e owner na mesma org); cross-org apenas como exceção explícita e auditada.
+
+Diagrama da camada de tenant no artifact (seção "Multitenancy") e na cópia HTML ao lado desta spec.
+
 ## Riscos e mitigação
 
 - **Schema ≠ código até a fase de implementação:** a renomeação `healthProfessionalId → appliedByProfessionalId` e a remoção do vínculo quebram compilação dos services se `prisma generate` for rodado antes da fase de código. Por isso esta entrega **não** roda generate/migrate.
