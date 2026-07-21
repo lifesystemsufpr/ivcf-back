@@ -10,6 +10,7 @@ import { FilterParticipantDto } from "./dto/filter-participant.dto";
 import { Gender, Prisma } from "@prisma/client";
 import { normalizeString } from "src/shared/functions/normalize-string";
 import { FragilityDashboardQueryDto } from "./dto/fragility-dashboard.dto";
+import { ClassifiedParticipantsQueryDto } from "./dto/classified-participants-query.dto";
 import type {
   IvcfDomainScores,
   IvcfAssessment,
@@ -24,6 +25,7 @@ import type {
   IVCF_Assessment,
   Daily_Assessment,
   ParticipantEvolutionDailyData,
+  ClassifiedParticipantsResponse,
 } from "./interfaces/ivcf-evolution.interface";
 
 @Injectable()
@@ -2036,5 +2038,121 @@ export class QuestionnaireService {
     });
 
     return this.computeAssessment(response);
+  }
+
+  async findParticipantsByClassification(
+    healthProfessionalId: string,
+    query: ClassifiedParticipantsQueryDto,
+  ): Promise<ClassifiedParticipantsResponse> {
+    const {
+      classification,
+      page = 1,
+      pageSize = 10,
+      orderBy = "score",
+      orderDirection = "desc",
+    } = query;
+
+    const matchingLabels = this.getMatchingClassificationLabels(classification);
+    const skip = (page - 1) * pageSize;
+
+    const orderColumn =
+      orderBy === "name"
+        ? '"participantName"'
+        : orderBy === "age"
+          ? '"age"'
+          : orderBy === "date"
+            ? '"date"'
+            : '"score"';
+
+    const direction = orderDirection === "asc" ? "ASC" : "DESC";
+
+    const countResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::int AS count FROM (
+        SELECT DISTINCT ON (qr."participantId") qr."id"
+        FROM "questionnaire_response" AS qr
+        INNER JOIN "questionnaire" AS q
+          ON q."id" = qr."questionnaireId"
+        INNER JOIN "participant" AS p
+          ON p."id" = qr."participantId"
+        INNER JOIN "user" AS u
+          ON u."id" = p."id"
+        WHERE qr."healthProfessionalId" = ${healthProfessionalId}
+          AND q."slug" = 'ivcf-20'
+          AND p."active" = true
+          AND u."active" = true
+          AND qr."classification" IN (${Prisma.join(matchingLabels)})
+        ORDER BY qr."participantId", qr."createdAt" DESC
+      ) AS latest
+    `;
+
+    const total = Number(countResult[0].count);
+
+    const rows = await this.prisma.$queryRaw<Array<{
+      participantId: string;
+      score: number;
+      classification: string;
+      date: Date;
+      participantName: string;
+      healthProfessionalName: string;
+      birthday: Date;
+    }>>`
+      SELECT
+        latest."participantId",
+        latest."totalScore" AS score,
+        latest."classification",
+        latest."date",
+        latest."participantName",
+        latest."healthProfessionalName",
+        latest."birthday"
+      FROM (
+        SELECT DISTINCT ON (qr."participantId")
+          qr."participantId",
+          qr."totalScore",
+          qr."classification",
+          qr."date",
+          u."fullName" AS "participantName",
+          hpUser."fullName" AS "healthProfessionalName",
+          p."birthday"
+        FROM "questionnaire_response" AS qr
+        INNER JOIN "questionnaire" AS q
+          ON q."id" = qr."questionnaireId"
+        INNER JOIN "participant" AS p
+          ON p."id" = qr."participantId"
+        INNER JOIN "user" AS u
+          ON u."id" = p."id"
+        INNER JOIN "health_professional" AS hp
+          ON hp."id" = qr."healthProfessionalId"
+        INNER JOIN "user" AS hpUser
+          ON hpUser."id" = hp."id"
+        WHERE qr."healthProfessionalId" = ${healthProfessionalId}
+          AND q."slug" = 'ivcf-20'
+          AND p."active" = true
+          AND u."active" = true
+        ORDER BY qr."participantId", qr."createdAt" DESC
+      ) AS latest
+      WHERE latest."classification" IN (${Prisma.join(matchingLabels)})
+      ORDER BY ${Prisma.raw(`${orderColumn} ${direction}`)}
+      LIMIT ${pageSize} OFFSET ${skip}
+    `;
+
+    const data = rows.map((row) => ({
+      participantId: row.participantId,
+      participantName: row.participantName,
+      age: this.getAge(row.birthday),
+      healthProfessionalName: row.healthProfessionalName,
+      score: row.score,
+      classification: row.classification,
+      date: row.date.toISOString(),
+    }));
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        pageSize,
+        lastPage: Math.ceil(total / pageSize) || 1,
+      },
+    };
   }
 }
