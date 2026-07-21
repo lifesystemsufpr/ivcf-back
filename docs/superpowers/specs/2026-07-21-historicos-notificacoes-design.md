@@ -93,18 +93,21 @@ Hoje `QuestionnaireResponse` liga participante ↔ profissional ↔ questionári
 - Endpoints do fluxo de solicitação/aprovação e de leitura de notificações.
 - Detecção de duplicidade no cadastro ("já existe?") — hoje inexistente; exigirá critério (e-mail/CPF).
 
-## Sugestão: Multitenancy (fora de escopo, recomendação)
+## Instituições & multitenancy — decisão para saúde pública
 
-**Diagnóstico:** o sistema hoje **não é multitenant**. Não há entidade de tenant; `Researcher.institutionId` é uma string sem FK e não escopa nada. Instituições diferentes na mesma instância compartilham o espaço de dados — e a listagem de "profissionais com base ativa" do fluxo de compartilhamento atravessaria instituições sem controle.
+**Contexto:** o destino do sistema é a rede pública (SUS), num projeto da UF. O IVCF-20 é aplicado por equipe multiprofissional (fisioterapia, enfermagem, medicina etc. — o campo `HealthProfessional.speciality` já cobre isso) e o idoso circula entre serviços (UBS, ambulatório, hospital).
 
-**Recomendação (quando for priorizado):** banco e schema compartilhados com **coluna discriminadora** `organizationId` — estratégia padrão para o porte do projeto; RLS do Postgres como endurecimento posterior.
+**Decisão: sem tenant.** O valor do fluxo de compartilhamento é a coordenação do cuidado *entre* unidades — um muro de tenant por instituição quebraria a descoberta de bases no melhor caso de uso. O cidadão é um só: registro de participante único e global na instância. A estrutura administrativa da rede entra como **dimensão de análise**, não como fronteira de dados. O isolamento clínico continua sendo por profissional, via `HistoricoBase`.
 
-- Nova `Organization` (`id`, `name`, `slug @unique`, `active`).
-- `User.organizationId` FK obrigatória; `Participant`/`HealthProfessional`/`Researcher` herdam o escopo via `User` (id compartilhado). `Researcher.institutionId` promovida a FK para `Organization`.
-- `organizationId` **denormalizado** em `HistoricoBase`, `ShareRequest` e `Notification`, com índices compostos (`@@index([organizationId, ...])`), para que as queries do fluxo nasçam filtradas por tenant sem join até `User`.
-- **Decisão de produto pendente:** compartilhamento de base entre instituições. Sugestão: mesmo tenant por padrão (service valida requester e owner na mesma org); cross-org apenas como exceção explícita e auditada.
+**`HealthUnit` (nova, tabela de referência):**
 
-Diagrama da camada de tenant no artifact (seção "Multitenancy") e na cópia HTML ao lado desta spec.
+- `id`, `name` (+ `name_normalized`, padrão do projeto), `cnesCode? @unique` (código CNES — identificador oficial de estabelecimentos do SUS, dá interoperabilidade de graça), `type?` (UBS/hospital/…), `city?`, `state?`, `active`.
+- `HealthProfessional.healthUnitId?` FK opcional (lotação; opcional para não travar cadastro).
+- `Researcher.institutionId` promovida de string solta a FK para `HealthUnit`.
+- Ganho no fluxo: na escolha de bases, o solicitante vê "profissional — especialidade — unidade".
+- Ganho na gestão/pesquisa: dashboards por unidade/tipo/região (fragilidade média por UBS etc.).
+
+**Multitenancy fica como opção futura**, apenas se o projeto virar plataforma multi-município com exigência de segregação administrativa: aí a `HealthUnit` evolui para baixo de uma `Organization` (secretaria municipal), com coluna discriminadora `organizationId` + filtro automático via Prisma `$extends` + RLS do Postgres como defesa em profundidade. Nada disso é pago agora.
 
 ## Riscos e mitigação
 
