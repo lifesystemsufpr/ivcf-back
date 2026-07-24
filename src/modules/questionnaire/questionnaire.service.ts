@@ -2050,6 +2050,11 @@ export class QuestionnaireService {
       pageSize = 10,
       orderBy = "score",
       orderDirection = "desc",
+      sex,
+      ageMin,
+      ageMax,
+      start,
+      end,
     } = query;
 
     const matchingLabels = this.getMatchingClassificationLabels(classification);
@@ -2066,6 +2071,27 @@ export class QuestionnaireService {
 
     const direction = orderDirection === "asc" ? "ASC" : "DESC";
 
+    const sexCondition =
+      sex && sex !== "all"
+        ? Prisma.sql`AND p."gender" = ${sex === "M" ? "MALE" : "FEMALE"}::"Gender"`
+        : Prisma.empty;
+
+    const ageMinCondition = ageMin
+      ? Prisma.sql`AND p."birthday" <= (CURRENT_DATE - make_interval(years => ${ageMin}))`
+      : Prisma.empty;
+
+    const ageMaxCondition = ageMax
+      ? Prisma.sql`AND p."birthday" >= (CURRENT_DATE - make_interval(years => ${ageMax + 1}) + interval '1 day')`
+      : Prisma.empty;
+
+    const startCondition = start
+      ? Prisma.sql`AND qr."date" >= ${new Date(start)}`
+      : Prisma.empty;
+
+    const endCondition = end
+      ? Prisma.sql`AND qr."date" <= ${new Date(end)}`
+      : Prisma.empty;
+
     const countResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::int AS count FROM (
         SELECT DISTINCT ON (qr."participantId") qr."id"
@@ -2081,6 +2107,11 @@ export class QuestionnaireService {
           AND p."active" = true
           AND u."active" = true
           AND qr."classification" IN (${Prisma.join(matchingLabels)})
+          ${sexCondition}
+          ${ageMinCondition}
+          ${ageMaxCondition}
+          ${startCondition}
+          ${endCondition}
         ORDER BY qr."participantId", qr."createdAt" DESC
       ) AS latest
     `;
@@ -2128,6 +2159,11 @@ export class QuestionnaireService {
           AND q."slug" = 'ivcf-20'
           AND p."active" = true
           AND u."active" = true
+          ${sexCondition}
+          ${ageMinCondition}
+          ${ageMaxCondition}
+          ${startCondition}
+          ${endCondition}
         ORDER BY qr."participantId", qr."createdAt" DESC
       ) AS latest
       WHERE latest."classification" IN (${Prisma.join(matchingLabels)})
