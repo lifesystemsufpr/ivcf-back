@@ -1,5 +1,15 @@
 import { Type } from "class-transformer";
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from "class-validator";
+import {
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from "class-validator";
 
 export class ClassifiedParticipantsQueryDto {
   @IsString()
@@ -26,4 +36,26 @@ export class ClassifiedParticipantsQueryDto {
   @IsOptional()
   @IsIn(["asc", "desc"])
   orderDirection?: string = "desc";
+
+  @IsOptional()
+  @IsIn(["M", "F", "all"])
+  sex?: "M" | "F" | "all";
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  ageMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  ageMax?: number;
+
+  @IsOptional()
+  @IsDateString()
+  start?: string;
+
+  @IsOptional()
+  @IsDateString()
+  end?: string;
 }
