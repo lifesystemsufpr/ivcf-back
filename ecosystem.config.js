@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'ivcf-api',
-    script: 'dist/main.js',
+    script: 'dist/src/main.js',
     cwd: '/var/www/ivcf-api',
     instances: 1,
     exec_mode: 'fork',
