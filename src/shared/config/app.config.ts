@@ -1,8 +1,27 @@
 import { Logger } from "@nestjs/common";
-import { AppConfig, SecurityConfig } from "./config.interface";
+import {
+  AppConfig,
+  SecurityConfig,
+  EmailConfig,
+  PasswordRecoveryConfig,
+} from "./config.interface";
 
 const DEFAULT_EXP_TIME = 86400;
 const SEVEN_DAYS_IN_SECONDS = 604800; // 604800
+
+function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  return value.toLowerCase() === "true";
+}
+
+function normalizeSwaggerPath(path: string | undefined): string {
+  const normalized = (path || "api-docs").replace(/^\/+|\/+$/g, "");
+
+  return normalized.replace(/^backend\//, "") || "api-docs";
+}
 
 // eslint-disable-next-line sonarjs/function-return-type
 function getCorsOrigins(
@@ -33,6 +52,15 @@ export default () => {
       : SEVEN_DAYS_IN_SECONDS,
   };
 
+  const emailConfig: EmailConfig = {
+    smtpHost: process.env.SMTP_HOST || "smtp.gmail.com",
+    smtpPort: process.env.SMTP_PORT ? +process.env.SMTP_PORT : 587,
+    smtpUser: process.env.SMTP_USER || "",
+    smtpPassword: process.env.SMTP_PASSWORD || "",
+    fromAddress: process.env.SMTP_FROM || "noreply@tecnoaging.com",
+    fromName: process.env.SMTP_FROM_NAME || "Life Systems",
+  };
+
   const appConfig: AppConfig = {
     nest: {
       port: process.env.NEST_PORT ? +process.env.NEST_PORT : 3333,
@@ -45,18 +73,25 @@ export default () => {
       title: process.env.SWAGGER_TITLE || "tecnoaging-web",
       description: process.env.SWAGGER_DESCRIPTION || "API Documentation",
       version: process.env.SWAGGER_VERSION || "1.0.0",
-      path: process.env.SWAGGER_PATH || "api-docs",
-      enabled: process.env.SWAGGER_ENABLED
-        ? Boolean(process.env.SWAGGER_ENABLED)
-        : true,
+      path: normalizeSwaggerPath(process.env.SWAGGER_PATH),
+      enabled: parseBoolean(process.env.SWAGGER_ENABLED, true),
+      useGlobalPrefix: true,
     },
     cors: {
-      enabled: process.env.CORS_ENABLED
-        ? Boolean(process.env.CORS_ENABLED)
-        : false,
+      enabled: parseBoolean(process.env.CORS_ENABLED, false),
       corsOrigins: getCorsOrigins(process.env.CORS_ORIGINS),
     },
     security: securityConfig,
+    email: emailConfig,
+    passwordRecovery: {
+      frontendBaseUrl:
+        process.env.PASSWORD_RECOVERY_FRONTEND_URL ||
+        process.env.FRONTEND_URL ||
+        "http://localhost:3000",
+      tokenExpiryMinutes: process.env.PASSWORD_RECOVERY_TOKEN_EXPIRY_MINUTES
+        ? Number(process.env.PASSWORD_RECOVERY_TOKEN_EXPIRY_MINUTES)
+        : 15,
+    } satisfies PasswordRecoveryConfig,
   };
 
   const logger = new Logger("AppConfig");

@@ -8,13 +8,13 @@ export interface AccessToken {
 export interface JwtPayload {
   sub: string;
   username: string;
-  cpf: string;
+  email: string;
   role: SystemRole;
 }
 
 export interface Payload {
   id: string;
-  cpf: string;
+  email: string;
   fullName: string;
   role: SystemRole;
 }

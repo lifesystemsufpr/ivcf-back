@@ -24,7 +24,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   // Passport builda um objeto user com base no retorno desse método, e anexa ao objeto Request (req.user)
   async validate(payload: JwtPayload): Promise<Payload> {
-    const user = await this.userService.findByCpf(payload.cpf);
+    const user = await this.userService.findByEmail(payload.email);
 
     if (!user) {
       this.logger.error(
@@ -35,7 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       id: user.id,
-      cpf: user.cpf,
+      email: user.email,
       fullName: user.fullName,
       role: user.role,
     };

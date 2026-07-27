@@ -3,6 +3,8 @@ export interface AppConfig {
   cors: CorsConfig;
   swagger: SwaggerConfig;
   security: SecurityConfig;
+  email: EmailConfig;
+  passwordRecovery: PasswordRecoveryConfig;
 }
 
 export interface NestConfig {
@@ -19,6 +21,20 @@ export interface SecurityConfig {
   jwtRefreshExpirationTime: number;
 }
 
+export interface EmailConfig {
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPassword: string;
+  fromAddress: string;
+  fromName: string;
+}
+
+export interface PasswordRecoveryConfig {
+  frontendBaseUrl: string;
+  tokenExpiryMinutes: number;
+}
+
 export interface CorsConfig {
   enabled: boolean;
   corsOrigins: boolean | string[] | string;
@@ -30,4 +46,5 @@ export interface SwaggerConfig {
   version: string;
   path: string;
   enabled: boolean;
+  useGlobalPrefix: boolean;
 }

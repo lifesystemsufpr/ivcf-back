@@ -1,27 +1,29 @@
+import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { INestApplication } from "@nestjs/common";
-import {
-  DocumentBuilder,
-  SwaggerCustomOptions,
-  SwaggerModule,
-} from "@nestjs/swagger";
 import { SwaggerConfig } from "./config.interface";
 
-export const setupSwagger = (
-  app: INestApplication,
-  swaggerConfig: SwaggerConfig,
-) => {
-  const documentOptions = new DocumentBuilder()
-    .setTitle(swaggerConfig.title)
-    .setDescription(swaggerConfig.description)
-    .setVersion(swaggerConfig.version)
-    .addBearerAuth()
-    .build();
+export function setupSwagger(app: INestApplication, config: SwaggerConfig) {
+  const builder = new DocumentBuilder()
+    .setTitle(config.title)
+    .setDescription(config.description)
+    .setVersion(config.version)
+    .addBearerAuth(
+      {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        in: "header",
+        name: "Authorization",
+      },
+      "bearer",
+    )
+    .addSecurityRequirements("bearer");
 
-  const document = SwaggerModule.createDocument(app, documentOptions);
-  const customOptions: SwaggerCustomOptions = {
-    yamlDocumentUrl: swaggerConfig.path + "/export",
-    raw: ["yaml"],
-  };
+  const document = SwaggerModule.createDocument(app, builder.build());
 
-  SwaggerModule.setup(swaggerConfig.path, app, document, customOptions);
-};
+  SwaggerModule.setup(config.path, app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
+}

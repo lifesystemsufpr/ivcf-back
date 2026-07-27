@@ -17,6 +17,11 @@ class AnswerDto {
   @IsOptional()
   selectedOptionId?: string;
 
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  @IsOptional()
+  selectedOptionIds?: string[];
+
   @IsString()
   @IsOptional()
   valueText?: string;
@@ -34,10 +39,6 @@ export class CreateResponseDto {
   @IsUUID()
   @IsNotEmpty()
   questionnaireId: string;
-
-  @IsString()
-  @IsNotEmpty()
-  healthcareUnitId: string;
 
   @IsArray()
   @ValidateNested({ each: true })

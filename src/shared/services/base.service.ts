@@ -37,7 +37,7 @@ export abstract class BaseService<T extends PrismaDelegate, TransformedEntity> {
 
     const searchWhere: WhereInput<T> = {};
 
-    const nonNormalizedFields = ["cpf", "email"];
+    const nonNormalizedFields = ["email"];
 
     if (search && this.searchableFields.length > 0) {
       const normalizedSearch = normalizeString(search) || "";

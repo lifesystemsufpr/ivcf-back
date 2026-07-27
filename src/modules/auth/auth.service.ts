@@ -3,14 +3,24 @@ import {
   Injectable,
   Logger,
   UnauthorizedException,
+  BadRequestException,
+  InternalServerErrorException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { AccessToken, JwtPayload, Payload } from "./interfaces/auth.interface";
 import { User } from "@prisma/client";
 import { PrismaService } from "src/shared/prisma/prisma.service";
-import { comparePassword } from "src/shared/functions/hash-password";
+import {
+  comparePassword,
+  hashPassword,
+} from "src/shared/functions/hash-password";
 import { ConfigService } from "@nestjs/config";
-import { SecurityConfig } from "src/shared/config/config.interface";
+import {
+  SecurityConfig,
+  PasswordRecoveryConfig,
+} from "src/shared/config/config.interface";
+import { EmailService } from "src/shared/services/email.service";
+import { createHash, randomBytes } from "crypto";
 
 @Injectable()
 export class AuthService {
@@ -20,52 +30,34 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   async validateCredentials(
-    cpf: string,
+    email: string,
     password: string,
   ): Promise<Partial<User> | null> {
     try {
-      const dbUrl = process.env.DATABASE_URL || "NÃO DEFINIDA";
-
-      const user = await this.prisma.user.findFirst({
-        where: { cpf },
+      const user = await this.prisma.user.findUnique({
+        where: { email },
         select: {
           id: true,
           fullName: true,
-          cpf: true,
+          email: true,
           role: true,
           password: true,
           active: true,
         },
       });
 
-      if (!user) {
-        throw new UnauthorizedException({
-          debug_error: "USUÁRIO_NAO_ENCONTRADO",
-          message: `O CPF ${cpf} não retornou nenhum registro.`,
-          server_env: process.env.NODE_ENV,
-          db_check: dbUrl.split("@")[1] || "Url mal formatada ou local",
-        });
-      }
-
-      if (user.active === false) {
-        throw new ForbiddenException({
-          debug_error: "USUARIO_INATIVO",
-          message: "Conta desativada",
-        });
+      if (!user || user.active === false) {
+        throw new UnauthorizedException("Credenciais inválidas");
       }
 
       const isPasswordValid = await comparePassword(password, user.password);
 
       if (!isPasswordValid) {
-        throw new UnauthorizedException({
-          debug_error: "SENHA_INCORRETA",
-          message: "O hash não bateu.",
-          stored_hash_prefix: user.password.substring(0, 10),
-          received_password_len: password.length,
-        });
+        throw new UnauthorizedException("Credenciais inválidas");
       }
 
       const { password: _, ...result } = user;
@@ -77,12 +69,10 @@ export class AuthService {
       ) {
         throw error;
       }
-
-      throw new UnauthorizedException({
-        debug_error: "ERRO_TECNICO_UNCAUGHT",
-        details: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : null,
-      });
+      this.logger.error("Erro ao validar credenciais", error as Error);
+      throw new InternalServerErrorException(
+        "Ocorreu um erro ao validar o acesso",
+      );
     }
   }
 
@@ -95,7 +85,7 @@ export class AuthService {
 
     const payload: Record<string, any> = {
       username: user.fullName,
-      cpf: user.cpf,
+      email: user.email,
       sub: user.id,
       role: user.role,
     };
@@ -159,7 +149,7 @@ export class AuthService {
       select: {
         id: true,
         fullName: true,
-        cpf: true,
+        email: true,
         role: true,
       },
     });
@@ -168,5 +158,83 @@ export class AuthService {
       return null;
     }
     return user;
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return;
+    }
+
+    const passwordRecoveryConfig =
+      this.configService.getOrThrow<PasswordRecoveryConfig>(
+        "passwordRecovery",
+      );
+
+    const resetToken = this.generateResetToken();
+    const resetTokenHash = this.hashResetToken(resetToken);
+    const expiresAt = new Date(
+      Date.now() + passwordRecoveryConfig.tokenExpiryMinutes * 60 * 1000,
+    );
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetTokenHash,
+        passwordResetExpiresAt: expiresAt,
+        passwordResetUsedAt: null,
+      },
+    });
+
+    const resetLink = `${passwordRecoveryConfig.frontendBaseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+
+    await this.emailService.sendPasswordResetEmail(
+      user.email,
+      user.fullName,
+      resetLink,
+      passwordRecoveryConfig.tokenExpiryMinutes,
+    );
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const resetTokenHash = this.hashResetToken(token);
+    const user = await this.prisma.user.findFirst({
+      where: { passwordResetToken: resetTokenHash },
+    });
+
+    if (!user || !user.passwordResetToken) {
+      throw new BadRequestException("Token inválido ou expirado.");
+    }
+
+    if (!user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
+      throw new BadRequestException("Token inválido ou expirado.");
+    }
+
+    if (user.passwordResetUsedAt) {
+      throw new BadRequestException("Token de recuperação já foi utilizado.");
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null,
+        passwordResetUsedAt: new Date(),
+      },
+    });
+  }
+
+  private generateResetToken(): string {
+    return randomBytes(32).toString("hex");
+  }
+
+  private hashResetToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
   }
 }

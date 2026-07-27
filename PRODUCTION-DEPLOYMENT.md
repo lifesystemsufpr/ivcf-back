@@ -1,6 +1,6 @@
 # Production Deployment Guide
 
-This guide explains how to deploy the TecnoAging NestJS application to production directly on an Azure VM.
+This guide explains how to deploy the Life Systems NestJS application to production directly on an Azure VM.
 
 ## 🚀 Quick Start
 

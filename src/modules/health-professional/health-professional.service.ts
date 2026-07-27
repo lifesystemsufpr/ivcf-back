@@ -4,7 +4,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { CreateHealthProfessionalDto } from "./dto/create-health-professional.dto";
-import { UpdateHealthProfessionalDto } from "./dto/update-health-professional.dto";
+import {
+  LinkParticipantDto,
+  UpdateHealthProfessionalDto,
+} from "./dto/update-health-professional.dto";
 import { PrismaService } from "src/shared/prisma/prisma.service";
 import { UserService } from "../users/user.service";
 import { HealthProfessional, Prisma, SystemRole, User } from "@prisma/client";
@@ -31,7 +34,7 @@ export class HealthProfessionalService extends BaseService<
     super(
       prisma,
       prisma.healthProfessional,
-      ["user.fullName", "user.cpf", "speciality"],
+      ["user.fullName", "user.email", "speciality"],
       {
         user: true,
       },
@@ -54,7 +57,7 @@ export class HealthProfessionalService extends BaseService<
       const {
         user: createUser,
         speciality,
-        ...createHealthProfessional
+        ...healthProfessionalData
       } = createHealthProfessionalDto;
 
       const user = await this.userService.createUser(
@@ -69,14 +72,17 @@ export class HealthProfessionalService extends BaseService<
 
       const healthProfessional = await tx.healthProfessional.create({
         data: {
-          ...createHealthProfessional,
+          ...healthProfessionalData,
           speciality,
           speciality_normalized: normalizedSpeciality,
           id: user.id,
         },
       });
 
-      return { ...user, ...healthProfessional };
+      return {
+        ...user,
+        ...healthProfessional,
+      };
     });
   }
 
@@ -232,5 +238,33 @@ export class HealthProfessionalService extends BaseService<
 
   async checkDeletability(id: string) {
     return await this.prisma.checkDeletionSafety("healthProfessional", id);
+  }
+
+  async linkParticipant(
+    linkParticipantDto: LinkParticipantDto,
+    healthProfessionalId: string,
+  ) {
+    const { participantId } = linkParticipantDto;
+
+    const linkAlreadyExists =
+      await this.prisma.healthProfessionalParticipant.findFirst({
+        where: {
+          participantId,
+          healthProfessionalId,
+        },
+      });
+
+    if (linkAlreadyExists) {
+      throw new BadRequestException(
+        "O participante já está vinculado a este profissional de saúde.",
+      );
+    }
+
+    return this.prisma.healthProfessionalParticipant.create({
+      data: {
+        participantId,
+        healthProfessionalId,
+      },
+    });
   }
 }

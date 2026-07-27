@@ -20,6 +20,8 @@ declare namespace NodeJS {
     SWAGGER_VERSION?: string;
     SWAGGER_PATH?: string;
     SWAGGER_ENABLED?: string;
+    SWAGGER_USER?: string;
+    SWAGGER_PASSWORD?: string;
 
     // Configurações do CORS
     CORS_ENABLED?: string;

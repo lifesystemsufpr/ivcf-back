@@ -163,7 +163,7 @@ async function main() {
                   options: {
                     create: [
                       { label: 'Não', score: 0, order: 1 },
-                      { label: 'Sim', score: 0, order: 2 },
+                      { label: 'Sim', score: 1, order: 2 },
                     ],
                   },
                 },
@@ -175,7 +175,7 @@ async function main() {
                   options: {
                     create: [
                       { label: 'Não', score: 0, order: 1 },
-                      { label: 'Sim', score: 0, order: 2 },
+                      { label: 'Sim', score: 1, order: 2 },
                     ],
                   },
                 },
@@ -187,7 +187,7 @@ async function main() {
                   options: {
                     create: [
                       { label: 'Não', score: 0, order: 1 },
-                      { label: 'Sim', score: 4, order: 2 },
+                      { label: 'Sim', score: 2, order: 2 },
                     ],
                   },
                 },
@@ -208,7 +208,7 @@ async function main() {
                   options: {
                     create: [
                       { label: 'Não', score: 0, order: 1 },
-                      { label: 'Sim', score: 0, order: 2 },
+                      { label: 'Sim', score: 2, order: 2 },
                     ],
                   },
                 },
@@ -276,8 +276,23 @@ async function main() {
                       type: QuestionType.MULTIPLE_CHOICE,
                       options: {
                         create: [
-                          { label: 'Não', score: 0, order: 1 },
-                          { label: 'Sim', score: 2, order: 2 },
+                          {
+                            label: 'Perda de peso maior que 4,5 kg no último ano',
+                            score: 2,
+                            order: 1,
+                          },
+                          { label: 'IMC menor que 22 kg/m²', score: 2, order: 2 },
+                          {
+                            label: 'Circunferência da panturrilha menor que 31 cm',
+                            score: 2,
+                            order: 3,
+                          },
+                          {
+                            label: 'Tempo de marcha (4 m) maior que 5 segundos',
+                            score: 2,
+                            order: 4,
+                          },
+                          { label: 'Nenhuma das condições', score: 0, order: 5 },
                         ],
                       },
                     },
@@ -348,7 +363,7 @@ async function main() {
                   questions: {
                     create: {
                       statement:
-                        'Você tem problemas de visão capazes de impedir a realização de alguma atividade do cotidiano?',
+                        'Você tem problemas de visão capazes de impedir a realização de alguma atividade do cotidiano? É permitido o uso de óculos ou lentes de contato.',
                       order: 18,
                       type: QuestionType.MULTIPLE_CHOICE,
                       options: {
@@ -366,7 +381,7 @@ async function main() {
                   questions: {
                     create: {
                       statement:
-                        'Você tem problemas de audição capazes de impedir a realização de alguma atividade do cotidiano?',
+                        'Você tem problemas de audição capazes de impedir a realização de alguma atividade do cotidiano? É permitido o uso de aparelhos de audição.',
                       order: 19,
                       type: QuestionType.MULTIPLE_CHOICE,
                       options: {
@@ -395,8 +410,22 @@ async function main() {
                 type: QuestionType.MULTIPLE_CHOICE,
                 options: {
                   create: [
-                    { label: 'Não', score: 0, order: 1 },
-                    { label: 'Sim', score: 4, order: 2 },
+                    {
+                      label: 'Cinco ou mais doenças crônicas (polipatologia)',
+                      score: 4,
+                      order: 1,
+                    },
+                    {
+                      label: 'Uso de cinco ou mais medicamentos (polifarmácia)',
+                      score: 4,
+                      order: 2,
+                    },
+                    {
+                      label: 'Internação hospitalar nos últimos 6 meses',
+                      score: 4,
+                      order: 3,
+                    },
+                    { label: 'Nenhuma das condições', score: 0, order: 4 },
                   ],
                 },
               },

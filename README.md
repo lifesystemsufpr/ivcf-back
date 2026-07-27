@@ -84,7 +84,7 @@ pnpm prisma:init
 > Swagger não carregando
 
 - Verifique se a variável de ambiente `SWAGGER_ENABLED` está definida para true
-- Verifique a rota da documentação via `SWAGGER_PATH` padrão: `backend/api-docs`
+- Verifique a rota da documentação via `SWAGGER_PATH` padrão: `api-docs` (URL final: `/backend/api-docs`)
 
 ## Arquitetura
 

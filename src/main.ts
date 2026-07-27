@@ -14,10 +14,13 @@ import { PrismaClientExceptionFilter } from "./shared/prisma/filters/prisma-clie
 import cookieParser = require("cookie-parser");
 import { NormalizationPipe } from "./shared/pipes/normalization.pipe";
 import { HttpAdapterHost } from "@nestjs/core";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import basicAuth = require("express-basic-auth");
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix("backend");
+  const globalPrefix = "backend";
+  app.setGlobalPrefix(globalPrefix);
   const logger = new Logger("AppInitializer");
 
   app.use(json({ limit: "50mb" }));
@@ -47,7 +50,30 @@ async function bootstrap() {
 
   if (swaggerConfig.enabled) {
     logger.log("Swagger enabled");
-    setupSwagger(app, swaggerConfig);
+
+    const swaggerPath = swaggerConfig.path;
+    const swaggerRoutes = [
+      `/${swaggerPath}`,
+      `/${swaggerPath}-json`,
+      `/${globalPrefix}/${swaggerPath}`,
+      `/${globalPrefix}/${swaggerPath}-json`,
+    ];
+
+    app.use(
+      swaggerRoutes,
+      basicAuth({
+        challenge: true,
+        users: {
+          [process.env.SWAGGER_USER || "admin"]:
+            process.env.SWAGGER_PASSWORD || "admin",
+        },
+      }),
+    );
+
+    setupSwagger(app, {
+      ...swaggerConfig,
+      path: `${globalPrefix}/${swaggerConfig.path}`,
+    });
   }
 
   if (corsConfig.enabled) {
@@ -59,6 +85,7 @@ async function bootstrap() {
         "https://localhost:3000",
         "https://*.vercel.app",
         "https://tecnoaging-front.vercel.app",
+        "http://localhost:5173",
       ],
       methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
       allowedHeaders: "Content-Type, Accept, Authorization, X-Requested-With",
@@ -75,6 +102,7 @@ async function bootstrap() {
         "https://localhost:3000",
         "https://*.vercel.app",
         "https://tecnoaging-front.vercel.app",
+        "http://localhost:5173",
       ],
       methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
       allowedHeaders: "Content-Type, Accept, Authorization, X-Requested-With",

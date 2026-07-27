@@ -1,0 +1,19 @@
+name: CI/CD Dev Deploy
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/build.yml
+    with:
+      environment: dev
+      deploy-path: /var/www/ivcf-api
+      ssh-port: 22
+    secrets:
+      DEPLOY_ENV_FILE: ${{ secrets.DEV_ENV_FILE }}
+      DEPLOY_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+      DEPLOY_SSH_USERNAME: ${{ secrets.DEV_SSH_USERNAME }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEV_SSH_KEY }}

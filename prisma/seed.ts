@@ -1,11 +1,11 @@
-import {
-  PrismaClient,
-  SystemRole,
-  Gender,
-  Scholarship,
-  SocialEconomicLevel,
-  QuestionType,
-} from "@prisma/client";
+/* eslint-disable sonarjs/pseudo-random */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable sonarjs/cognitive-complexity */
+/* eslint-disable sonarjs/no-dead-store */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+import { PrismaClient, SystemRole, Gender, QuestionType } from "@prisma/client";
 import { hashPassword } from "../src/shared/functions/hash-password";
 import { normalizeString } from "../src/shared/functions/normalize-string";
 import { fakerPT_BR as faker } from "@faker-js/faker";
@@ -35,8 +35,6 @@ async function main() {
   await prisma.researcher.deleteMany({});
   await prisma.healthProfessional.deleteMany({});
   await prisma.user.deleteMany({});
-  await prisma.institution.deleteMany({});
-  await prisma.healthcareUnit.deleteMany({});
 
   console.log("📝 Criando Questionário IVCF-20 Estrutural...");
 
@@ -277,8 +275,23 @@ async function main() {
                       type: QuestionType.MULTIPLE_CHOICE,
                       options: {
                         create: [
-                          { label: "Não", score: 0, order: 1 },
-                          { label: "Sim", score: 2, order: 2 },
+                          {
+                            label: "Perda de peso maior que 4,5 kg no último ano",
+                            score: 2,
+                            order: 1,
+                          },
+                          { label: "IMC menor que 22 kg/m²", score: 2, order: 2 },
+                          {
+                            label: "Circunferência da panturrilha menor que 31 cm",
+                            score: 2,
+                            order: 3,
+                          },
+                          {
+                            label: "Tempo de marcha (4 m) maior que 5 segundos",
+                            score: 2,
+                            order: 4,
+                          },
+                          { label: "Nenhuma das condições", score: 0, order: 5 },
                         ],
                       },
                     },
@@ -348,7 +361,7 @@ async function main() {
                   questions: {
                     create: {
                       statement:
-                        "Você tem problemas de visão capazes de impedir a realização de alguma atividade do cotidiano?",
+                        "Você tem problemas de visão capazes de impedir a realização de alguma atividade do cotidiano? É permitido o uso de óculos ou lentes de contato.",
                       order: 18,
                       type: QuestionType.MULTIPLE_CHOICE,
                       options: {
@@ -366,7 +379,7 @@ async function main() {
                   questions: {
                     create: {
                       statement:
-                        "Você tem problemas de audição capazes de impedir a realização de alguma atividade do cotidiano?",
+                        "Você tem problemas de audição capazes de impedir a realização de alguma atividade do cotidiano? É permitido o uso de aparelhos de audição.",
                       order: 19,
                       type: QuestionType.MULTIPLE_CHOICE,
                       options: {
@@ -392,8 +405,22 @@ async function main() {
                 type: QuestionType.MULTIPLE_CHOICE,
                 options: {
                   create: [
-                    { label: "Não", score: 0, order: 1 },
-                    { label: "Sim", score: 4, order: 2 },
+                    {
+                      label: "Cinco ou mais doenças crônicas (polipatologia)",
+                      score: 4,
+                      order: 1,
+                    },
+                    {
+                      label: "Uso de cinco ou mais medicamentos (polifarmácia)",
+                      score: 4,
+                      order: 2,
+                    },
+                    {
+                      label: "Internação hospitalar nos últimos 6 meses",
+                      score: 4,
+                      order: 3,
+                    },
+                    { label: "Nenhuma das condições", score: 0, order: 4 },
                   ],
                 },
               },
@@ -409,10 +436,15 @@ async function main() {
     include: {
       groups: {
         include: {
-          questions: { include: { options: true } },
+          questions: { include: { options: true, group: true } },
           subGroups: {
             include: {
-              questions: { include: { options: true } },
+              questions: {
+                include: {
+                  options: true,
+                  subGroup: { include: { group: true } },
+                },
+              },
             },
           },
         },
@@ -424,12 +456,19 @@ async function main() {
   if (ivcfFull?.groups) {
     ivcfFull.groups.forEach((group: any) => {
       if (group.questions) {
-        flatQuestions.push(...group.questions);
+        group.questions.forEach((q: any) => {
+          q.group = group;
+          flatQuestions.push(q);
+        });
       }
       if (group.subGroups) {
         group.subGroups.forEach((sub: any) => {
           if (sub.questions) {
-            flatQuestions.push(...sub.questions);
+            sub.questions.forEach((q: any) => {
+              q.subGroup = sub;
+              sub.group = group;
+              flatQuestions.push(q);
+            });
           }
         });
       }
@@ -440,28 +479,16 @@ async function main() {
 
   console.log("👑 Criando Usuários Fixos...");
 
-  await prisma.user.create({
-    data: {
-      cpf: "00000000000",
-      fullName: "Admin do Sistema",
-      fullName_normalized: "admin do sistema",
-      gender: Gender.OTHER,
-      password: passwordHash,
-      role: SystemRole.MANAGER,
-    },
-  });
-
   const fixedDoctor = await prisma.user.create({
     data: {
-      cpf: "11111111111",
+      email: "medico@sistema.com",
       fullName: "Dra. Ana Fixa",
       fullName_normalized: "dra. ana fixa",
-      gender: Gender.FEMALE,
       password: passwordHash,
       role: SystemRole.HEALTH_PROFESSIONAL,
       healthProfessional: {
         create: {
-          email: "ana.fixa@teste.com",
+          // O email foi removido daqui pois pertence apenas ao 'User'
           speciality: "Geriatria",
           speciality_normalized: "geriatria",
         },
@@ -477,55 +504,21 @@ async function main() {
 
   console.log("🏥 Criando Estrutura...");
 
-  await prisma.institution.create({
-    data: {
-      title: "UFPR",
-      title_normalized: normalizeString("UFPR") || "ufpr",
-    },
-  });
-
-  const units = await Promise.all([
-    prisma.healthcareUnit.create({
-      data: {
-        name: "UBS Centro",
-        name_normalized: normalizeString("UBS Centro") || "ubs centro",
-        zipCode: "80000000",
-        street: "Rua XV",
-        number: "10",
-        city: "Curitiba",
-        state: "PR",
-        neighborhood: "Centro",
-      },
-    }),
-    prisma.healthcareUnit.create({
-      data: {
-        name: "Hospital de Clínicas",
-        name_normalized:
-          normalizeString("Hospital de Clínicas") || "hospital de clinicas",
-        zipCode: "80060000",
-        street: "General Carneiro",
-        number: "181",
-        city: "Curitiba",
-        state: "PR",
-        neighborhood: "Alto da Glória",
-      },
-    }),
-  ]);
-
   console.log("👨‍⚕️ Criando Profissionais Aleatórios...");
   for (let i = 0; i < 5; i++) {
     const name = faker.person.fullName();
+    const hpEmail = `medico${i}@teste.com`;
+
     const hpUser = await prisma.user.create({
       data: {
-        cpf: faker.string.numeric(11),
+        email: hpEmail,
         fullName: name,
         fullName_normalized: normalizeString(name) || name.toLowerCase(),
-        gender: i % 2 === 0 ? Gender.MALE : Gender.FEMALE,
         password: passwordHash,
         role: SystemRole.HEALTH_PROFESSIONAL,
         healthProfessional: {
           create: {
-            email: faker.internet.email(),
+            // O email foi removido daqui pois pertence apenas ao 'User'
             speciality: "Fisioterapia",
             speciality_normalized: "fisioterapia",
           },
@@ -544,13 +537,15 @@ async function main() {
   for (let i = 0; i < 20; i++) {
     const sex = i % 2 === 0 ? "male" : "female";
     const name = faker.person.fullName({ sex });
+    const participantEmail = `paciente${i}@teste.com`;
+    const randomHPId =
+      healthProsIds[Math.floor(Math.random() * healthProsIds.length)];
 
     const participantUser = await prisma.user.create({
       data: {
-        cpf: faker.string.numeric(11),
+        email: participantEmail,
         fullName: name,
         fullName_normalized: normalizeString(name) || name.toLowerCase(),
-        gender: sex === "male" ? Gender.MALE : Gender.FEMALE,
         password: passwordHash,
         role: SystemRole.PARTICIPANT,
         participant: {
@@ -564,8 +559,12 @@ async function main() {
             city: "Curitiba",
             state: "PR",
             neighborhood: "Batel",
-            socio_economic_level: SocialEconomicLevel.C,
-            scholarship: Scholarship.HIGH_SCHOOL_COMPLETE,
+            gender: sex === "male" ? Gender.MALE : Gender.FEMALE,
+            healthProfessionalsLinks: {
+              create: {
+                healthProfessionalId: randomHPId,
+              },
+            },
           },
         },
       },
@@ -574,15 +573,13 @@ async function main() {
 
     if (!participantUser.participant) continue;
     const participantId = participantUser.participant.id;
-    const randomHPId =
-      healthProsIds[Math.floor(Math.random() * healthProsIds.length)];
 
     if (Math.random() > 0.2 && ivcfFull) {
       const responseDate = faker.date.recent({ days: 90 });
-      const randomUnit = units[Math.floor(Math.random() * units.length)];
       let totalScore = 0;
 
-      const answersData: AnswerInput[] = [];
+      const answersData: { questionId: string; selectedOptionId: string }[] =
+        [];
       const scoresByGroup: Record<string, { score: number; order: number }> =
         {};
 
@@ -591,7 +588,7 @@ async function main() {
 
         const isHealthy = Math.random() > 0.4;
         const selectedOption = isHealthy
-          ? question.options.find((o) => o.score === 0) ||
+          ? question.options.find((o: { score: number }) => o.score === 0) ||
             question.options[0]
           : question.options[
               Math.floor(Math.random() * question.options.length)
@@ -621,7 +618,7 @@ async function main() {
 
       let classification = "Robusto";
       if (totalScore >= 7 && totalScore <= 14) {
-        classification = "Em Risco de Fragilização";
+        classification = "Pré-frágil";
       } else if (totalScore >= 15) {
         classification = "Frágil";
       }
@@ -630,7 +627,6 @@ async function main() {
         data: {
           participantId: participantId,
           healthProfessionalId: randomHPId,
-          healthcareUnitId: randomUnit.id,
           questionnaireId: ivcfFull.id,
           date: responseDate,
           totalScore: totalScore,
@@ -645,9 +641,11 @@ async function main() {
 
   console.log("✅ Seed concluído com sucesso!");
   console.log("------------------------------------------------");
-  console.log("🔑 CREDENCIAIS:");
-  console.log("   ADMIN:   CPF 00000000000 / senha123");
-  console.log("   MÉDICO:  CPF 11111111111 / senha123");
+  console.log("🔑 CREDENCIAIS DE TESTE:");
+  console.log("   MÉDICO:  medico@sistema.com / senha123");
+  console.log(
+    "   (Demais profissionais e pacientes seguem o padrão medicoX@teste.com, pacienteX@teste.com)",
+  );
   console.log("------------------------------------------------");
 }
 

@@ -20,7 +20,7 @@ export class FilterQuestionnaireResponseDto {
 
   @IsOptional()
   @IsString()
-  participantCpf?: string;
+  participantEmail?: string;
 
   @IsOptional()
   @IsString()
@@ -28,7 +28,7 @@ export class FilterQuestionnaireResponseDto {
 
   @IsOptional()
   @IsString()
-  healthProfessionalCpf?: string;
+  healthProfessionalEmail?: string;
 
   @IsOptional()
   @IsString()

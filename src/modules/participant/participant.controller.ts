@@ -14,46 +14,70 @@ import { UpdateParticipantDto } from "./dto/update-participant.dto";
 import { ApiBearerAuth, ApiNoContentResponse } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { SystemRole } from "@prisma/client";
-import { Public } from "../auth/decorators/public.decorator";
-import { QueryDto } from "src/shared/dto/query.dto";
-@Controller("participant")
+import { RequestUser } from "../auth/decorators/request-user.decorator";
+import { Payload } from "../auth/interfaces/auth.interface";
+import { FindParticipantQueryDto } from "./dto/find-participant-query.dto";
+
 @ApiBearerAuth()
+@Controller("participant")
 export class ParticipantController {
   constructor(private readonly participantService: ParticipantService) {}
 
-  //Ver se vai ficar publico mesmo
-  @Public()
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Post()
-  create(@Body() createParticipantDto: CreateParticipantDto) {
-    return this.participantService.create(createParticipantDto);
+  create(
+    @RequestUser() user: Payload,
+    @Body() createParticipantDto: CreateParticipantDto,
+  ) {
+    return this.participantService.create(createParticipantDto, user.id);
   }
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Get()
-  findAll(@Query() queryDto: QueryDto) {
-    return this.participantService.findAll(queryDto);
+  findAll(
+    @RequestUser() user: Payload,
+    @Query() queryDto: FindParticipantQueryDto,
+    @Query() rawQuery: Record<string, unknown>,
+  ) {
+    return this.participantService.findAll(queryDto, user.id, rawQuery);
   }
 
   @Roles([SystemRole.PARTICIPANT, SystemRole.HEALTH_PROFESSIONAL])
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.participantService.findOne(id);
+  findOne(@RequestUser() user: Payload, @Param("id") id: string) {
+    return this.participantService.findOne(id, { requestUser: user });
   }
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Patch(":id")
   @ApiNoContentResponse()
   update(
+    @RequestUser() user: Payload,
     @Param("id") id: string,
     @Body() updateParticipantDto: UpdateParticipantDto,
   ) {
-    return this.participantService.update(id, updateParticipantDto);
+    return this.participantService.update(id, updateParticipantDto, user);
   }
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Delete(":id")
   @ApiNoContentResponse()
-  remove(@Param("id") id: string) {
-    return this.participantService.remove(id);
+  remove(@RequestUser() user: Payload, @Param("id") id: string) {
+    return this.participantService.remove(id, user);
+  }
+
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
+  @Get("check-email/:email")
+  checkEmail(
+    @RequestUser() _user: Payload,
+    @Param("email") email: string,
+  ): Promise<{ userId: string; participantId: string | undefined }> {
+    const participantService: {
+      checkEmail: (
+        value: string,
+      ) => Promise<{ userId: string; participantId: string | undefined }>;
+    } = this.participantService;
+
+    return participantService.checkEmail(email);
   }
 }

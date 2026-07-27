@@ -8,14 +8,15 @@ datasource db {
 
 model User {
   id                  String     @id @default(uuid())
-  cpf                 String     @unique
+  email               String     @unique
   fullName            String
   fullName_normalized String     @default("") @db.Text
   password            String
   active              Boolean    @default(true)
-  gender              Gender
   role                SystemRole
-  phone               String?
+  passwordResetToken   String?    @db.Text
+  passwordResetExpiresAt DateTime?
+  passwordResetUsedAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -30,7 +31,6 @@ model User {
 
 model Researcher {
   id            String  @id @unique
-  email         String  @unique
   institutionId String
   fieldOfStudy  String?
   active        Boolean @default(true)
@@ -39,31 +39,13 @@ model Researcher {
   updatedAt DateTime @default(now()) @updatedAt
 
   user        User        @relation(fields: [id], references: [id])
-  institution Institution @relation(fields: [institutionId], references: [id])
 
   @@index([institutionId])
   @@map("researcher")
 }
 
-model Institution {
-  id               String  @id @default(uuid())
-  title            String
-  title_normalized String  @default("") @db.Text
-  active           Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  researchers Researcher[]
-
-  @@index([title_normalized])
-  @@index([active])
-  @@map("institution")
-}
-
 model HealthProfessional {
   id                    String  @id @unique
-  email                 String  @unique
   active                Boolean @default(true)
   speciality            String
   speciality_normalized String  @default("") @db.Text
@@ -72,7 +54,9 @@ model HealthProfessional {
   updatedAt DateTime @default(now()) @updatedAt
 
   appliedQuestionnaires QuestionnaireResponse[]
-  user                  User                    @relation(fields: [id], references: [id])
+  user                  User @relation(fields: [id], references: [id])
+
+  participantsLinks HealthProfessionalParticipant[]
 
   @@index([speciality])
   @@index([speciality_normalized])
@@ -80,52 +64,44 @@ model HealthProfessional {
   @@map("health_professional")
 }
 
-model HealthcareUnit {
-  id              String  @id @default(uuid())
-  name            String
-  name_normalized String  @default("") @db.Text
-  zipCode         String
-  street          String
-  number          String
-  complement      String?
-  city            String
-  state           String
-  neighborhood    String
-  active          Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  questionnaireResponses QuestionnaireResponse[]
-
-  @@index([name_normalized])
-  @@index([active])
-  @@map("healthcare_unit")
-}
-
 model Participant {
-  id                   String              @id @unique
-  birthday             DateTime            @db.Date
-  weight               Int                 @default(0)
-  height               Int                 @default(0)
-  zipCode              String
-  street               String
-  number               String
-  complement           String?
-  city                 String
-  state                String
-  neighborhood         String
-  active               Boolean             @default(true)
-  socio_economic_level SocialEconomicLevel
-  scholarship          Scholarship
+  id           String   @id @unique
+  birthday     DateTime @db.Date
+  weight       Int      @default(0)
+  height       Int      @default(0)
+  zipCode      String
+  street       String
+  number       String
+  complement   String?
+  city         String
+  state        String
+  neighborhood String
+  active       Boolean  @default(true)
+  gender       Gender
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
   questionnaireResponses QuestionnaireResponse[]
-  user                   User                    @relation(fields: [id], references: [id])
+  user                   User @relation(fields: [id], references: [id])
+
+  healthProfessionalsLinks HealthProfessionalParticipant[]
 
   @@map("participant")
+}
+
+model HealthProfessionalParticipant {
+  healthProfessionalId String
+  participantId        String
+
+  createdAt DateTime @default(now())
+
+  healthProfessional HealthProfessional @relation(fields: [healthProfessionalId], references: [id], onDelete: Cascade)
+  participant        Participant        @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@id([healthProfessionalId, participantId])
+  @@index([participantId])
+  @@map("health_professional_participant")
 }
 
 model Questionnaire {
@@ -198,7 +174,7 @@ model Question {
 model QuestionOption {
   id    String @id @default(uuid())
   label String
-  score Int @default(0)
+  score Int    @default(0)
   order Int
 
   questionId String
@@ -213,7 +189,7 @@ model QuestionOption {
 model QuestionnaireResponse {
   id String @id @default(uuid())
 
-  totalScore     Int     @default(0)
+  totalScore     Int      @default(0)
   classification String?
   date           DateTime @default(now())
 
@@ -222,9 +198,6 @@ model QuestionnaireResponse {
 
   healthProfessionalId String
   healthProfessional   HealthProfessional @relation(fields: [healthProfessionalId], references: [id])
-
-  healthcareUnitId String
-  healthcareUnit   HealthcareUnit @relation(fields: [healthcareUnitId], references: [id])
 
   questionnaireId String
   questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id])
@@ -236,7 +209,7 @@ model QuestionnaireResponse {
 
   @@index([participantId])
   @@index([healthProfessionalId])
-  @@index([healthcareUnitId])
+  @@index([classification])
   @@map("questionnaire_response")
 }
 
@@ -277,25 +250,4 @@ enum Gender {
   MALE
   FEMALE
   OTHER
-}
-
-enum Scholarship {
-  NONE
-  FUNDAMENTAL_INCOMPLETE
-  FUNDAMENTAL_COMPLETE
-  HIGH_SCHOOL_INCOMPLETE
-  HIGH_SCHOOL_COMPLETE
-  HIGHER_EDUCATION_INCOMPLETE
-  HIGHER_EDUCATION_COMPLETE
-  POSTGRADUATE
-  MASTERS
-  DOCTORATE
-}
-
-enum SocialEconomicLevel {
-  A
-  B
-  C
-  D
-  E
 }

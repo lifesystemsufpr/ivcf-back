@@ -3,50 +3,34 @@ import { Gender, SystemRole } from "@prisma/client";
 import {
   IsBoolean,
   IsEnum,
+  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
-  MaxLength,
+  Matches,
   MinLength,
 } from "class-validator";
 
 export class CreateUserDto {
-  @ApiProperty({
-    description:
-      "User's CPF, must contain exactly 11 digits without punctuation.",
-    example: "12345678901",
-  })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(11)
-  @MaxLength(11)
-  cpf: string;
-
   @ApiProperty({
     description: "User's full name.",
     example: "Maria da Silva",
   })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^\s*\p{L}+(?:\s+\p{L}+)+\s*$/u, {
+    message: "O nome completo deve conter pelo menos nome e sobrenome.",
+  })
   fullName: string;
 
   @ApiProperty({
-    description: "User's phone number (optional).",
-    example: "41999998888",
-    required: false,
+    description: "User's email address (must be unique).",
+    example: "maria.silva@example.com",
   })
   @IsString()
-  @IsOptional()
-  phone?: string;
-
-  @ApiProperty({
-    description: "User's gender.",
-    enum: Gender,
-    example: "FEMALE",
-  })
-  @IsEnum(Gender)
   @IsNotEmpty()
-  gender: Gender;
+  @IsEmail({}, { message: "O e-mail fornecido é inválido." })
+  email: string;
 
   @ApiProperty({
     description: "User's role in the system.",
