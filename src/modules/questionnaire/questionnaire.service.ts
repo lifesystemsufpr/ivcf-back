@@ -2122,7 +2122,7 @@ export class QuestionnaireService {
         age: this.getAge(r.birthday),
         healthProfessionalName: r.healthProfessionalName,
         score: r.totalScore,
-        classification: r.classification ?? "",
+        classification: r.classification || this.classifyRisk(r.totalScore),
         date: r.date.toISOString(),
       }))
       .filter((r) =>
