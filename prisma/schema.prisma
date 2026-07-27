@@ -39,33 +39,10 @@ model Researcher {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  user        User       @relation(fields: [id], references: [id])
-  institution HealthUnit @relation(fields: [institutionId], references: [id])
+  user User @relation(fields: [id], references: [id])
 
   @@index([institutionId])
   @@map("researcher")
-}
-
-/// Estabelecimento de saúde/pesquisa (referência, não isolamento).
-/// cnesCode = Cadastro Nacional de Estabelecimentos de Saúde (SUS).
-model HealthUnit {
-  id              String  @id @default(uuid())
-  name            String
-  name_normalized String  @default("") @db.Text
-  cnesCode        String? @unique
-  type            String?
-  city            String?
-  state           String?
-  active          Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  professionals HealthProfessional[]
-  researchers   Researcher[]
-
-  @@index([name_normalized])
-  @@map("health_unit")
 }
 
 model HealthProfessional {
@@ -73,10 +50,6 @@ model HealthProfessional {
   active                Boolean @default(true)
   speciality            String
   speciality_normalized String  @default("") @db.Text
-
-  /// Lotação (opcional para não travar cadastro).
-  healthUnitId String?
-  healthUnit   HealthUnit? @relation(fields: [healthUnitId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt

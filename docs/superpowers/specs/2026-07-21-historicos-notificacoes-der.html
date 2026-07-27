@@ -291,58 +291,13 @@ erDiagram
   <h2>Instituições &amp; multitenancy — decisão para saúde pública</h2>
   <div class="decision">
     <span class="badge">Decisão</span>
-    <h3>Espaço de dados único + HealthUnit como cadastro (CNES) — sem tenant</h3>
-    <p>O destino do sistema é a <b>rede pública (SUS)</b>, num projeto da UF. Nesse contexto o idoso circula entre serviços (UBS, ambulatório, hospital) e o IVCF-20 é aplicado por equipe multiprofissional — fisioterapeutas, enfermagem, medicina. O valor do fluxo de compartilhamento é justamente a <b>coordenação do cuidado entre unidades</b>: um muro de tenant por instituição quebraria a descoberta de bases no melhor caso de uso. O cidadão é um só — registro de participante único e global na instância. A estrutura administrativa da rede entra como <b>dimensão de análise</b>, não como fronteira de dados.</p>
+    <h3>Espaço de dados único — sem tenant, sem entidade de estabelecimento</h3>
+    <p>O destino do sistema é a <b>rede pública (SUS)</b>, num projeto da UF. O idoso circula entre serviços (UBS, ambulatório, hospital) e o IVCF-20 é aplicado por equipe multiprofissional — fisioterapeutas, enfermagem, medicina. O valor do fluxo de compartilhamento é justamente a <b>coordenação do cuidado entre unidades</b>: um muro de tenant quebraria a descoberta de bases no melhor caso de uso. O cidadão é um só — registro de participante único e global. O isolamento clínico é por profissional, via <code>HistoricoBase</code>.</p>
     <div class="why">
-      <div><b>HealthUnit (referência)</b>Estabelecimento de saúde com nome, tipo e <b>código CNES</b> (identificador oficial SUS — interoperabilidade de graça). <code>HealthProfessional.healthUnitId</code> FK opcional; <code>Researcher.institutionId</code> promovida de string solta a FK real.</div>
-      <div><b>Ganho no fluxo</b>Na escolha de bases, o solicitante vê <i>"Dra. Fulana — Fisioterapia — UBS Boa Vista"</i>: especialidade (campo já existente) + unidade tornam a decisão informada.</div>
-      <div><b>Ganho na gestão/pesquisa</b>Dashboards por unidade/tipo/região: fragilidade média por UBS, aplicações por estabelecimento — o que secretaria e pesquisadores da UF vão pedir.</div>
-      <div><b>Tenant: só se multi-município</b>Se o projeto virar plataforma para vários municípios com exigência de segregação administrativa, a <code>HealthUnit</code> evolui para baixo de uma <code>Organization</code> (secretaria) com coluna discriminadora + RLS. Caminho documentado, custo zero agora.</div>
+      <div><b>Sem multitenancy</b>Nenhuma entidade de tenant no schema. Se o projeto um dia virar plataforma multi-município com exigência de segregação administrativa, o caminho documentado é coluna discriminadora <code>organizationId</code> + filtro automático (Prisma <code>$extends</code>) + RLS. Custo zero agora.</div>
+      <div><b>HealthUnit avaliada e descartada</b>Uma tabela de referência de estabelecimentos (nome, código CNES, lotação do profissional) foi desenhada, mas <b>removida do escopo</b> para enxugar a entrega — <code>Researcher.institutionId</code> permanece string, como hoje. Fica como sugestão futura na spec (ganhos: "profissional — especialidade — unidade" na escolha de bases; dashboards por unidade/região).</div>
     </div>
   </div>
-
-  <div class="diagram-card">
-    <pre class="mermaid">
-%%{init: {'theme':'dark','themeVariables':{'darkMode':true,'primaryColor':'#182226','primaryTextColor':'#e9eef0','primaryBorderColor':'#c792ea','lineColor':'#64757c'}}}%%
-erDiagram
-    HealthUnit ||--o{ HealthProfessional : "lota"
-    HealthUnit ||--o{ Researcher : "vincula"
-    User ||--o| Participant : "é"
-    User ||--o| HealthProfessional : "é"
-    User ||--o| Researcher : "é"
-    HealthProfessional ||--o{ HistoricoBase : "dono de"
-    Participant ||--o{ HistoricoBase : "possui"
-
-    HealthUnit {
-        string id PK
-        string name
-        string cnesCode UK
-        string type
-        string city
-        string state
-        boolean active
-    }
-    HealthProfessional {
-        string id PK
-        string healthUnitId FK
-        string speciality
-    }
-    Researcher {
-        string id PK
-        string institutionId FK
-    }
-    Participant {
-        string id PK
-        enum gender
-    }
-    HistoricoBase {
-        string id PK
-        string participantId FK
-        string ownerProfessionalId FK
-    }
-    </pre>
-  </div>
-  <p class="caption">roxo = camada de estabelecimentos (referência, não isolamento) · cnesCode = Cadastro Nacional de Estabelecimentos de Saúde · participante permanece global (cidadão único)</p>
 
   <footer>ivcf-api · prisma/schema.prisma · decisão registrada — próximo passo: doc de design + schema</footer>
 </div>

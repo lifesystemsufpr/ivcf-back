@@ -10,7 +10,7 @@ Levantamento do que deve ser **criado** e **adaptado** na API NestJS para o flux
 
 | Método/Rota | Papel no fluxograma | Comportamento |
 |---|---|---|
-| `GET /participants/:id/historico-bases` | "Sistema lista os profissionais" | Lista bases **ativas** do participante: dono (nome, especialidade, unidade via `HealthUnit`), `origin`, `createdAt`, contagem de respostas. Query única no índice `historico_base(participantId)`. Roles: `HEALTH_PROFESSIONAL`. |
+| `GET /participants/:id/historico-bases` | "Sistema lista os profissionais" | Lista bases **ativas** do participante: dono (nome, especialidade), `origin`, `createdAt`, contagem de respostas. Query única no índice `historico_base(participantId)`. Roles: `HEALTH_PROFESSIONAL`. |
 | `POST /participants/:id/historico-bases` | "Criar uma base do zero" | Cria `HistoricoBase(FROM_SCRATCH)` para o profissional autenticado sobre participante **já existente**. 409 se já possui base (unique do par). |
 
 ### 1.2 `share-request`
@@ -31,10 +31,6 @@ Levantamento do que deve ser **criado** e **adaptado** na API NestJS para o flux
 | `PATCH /notifications/:id/read` | Marca `readAt`. Só o destinatário. |
 | `PATCH /notifications/read-all` | Marca todas não-lidas. |
 
-### 1.4 `health-unit`
-
-CRUD simples (`GET /health-units` com busca por `name_normalized`, `POST/PATCH` restritos a `MANAGER`) para alimentar selects de lotação e a exibição "profissional — especialidade — unidade" na listagem de bases.
-
 ## 2. Endpoints existentes adaptados
 
 ### 2.1 `participant` ([participant.service.ts](../../../src/modules/participant/participant.service.ts))
@@ -54,17 +50,12 @@ CRUD simples (`GET /health-units` com busca por `name_normalized`, `POST/PATCH` 
 
 ### 2.3 `health-professional`
 
-- `create/update`: aceitar `healthUnitId?` no DTO.
 - Listagens que hoje expõem `participantsLinks` passam a derivar de `historicoBases`.
-
-### 2.4 `researcher`
-
-- `institutionId` vira FK: DTO passa a receber id de `HealthUnit` existente (ou endpoint de criação inline), com validação de existência.
 
 ## 3. DTOs novos/alterados
 
-- **Novos:** `CreateShareRequestDto`, `RespondShareRequestDto` (se reject levar justificativa), `FilterShareRequestDto`, `FilterNotificationDto`, `CreateHealthUnitDto`/`UpdateHealthUnitDto`, `CreateHistoricoBaseDto` (vazio ou só validação de rota).
-- **Alterados:** `CreateHealthProfessionalDto` (+`healthUnitId?`), `CreateResearcherDto` (`institutionId` validado como FK), resposta do `check-email` (+`hasActiveBases`), respostas de listagem de participantes (links → bases).
+- **Novos:** `CreateShareRequestDto`, `RespondShareRequestDto` (se reject levar justificativa), `FilterShareRequestDto`, `FilterNotificationDto`, `CreateHistoricoBaseDto` (vazio ou só validação de rota).
+- **Alterados:** resposta do `check-email` (+`hasActiveBases`), respostas de listagem de participantes (links → bases).
 
 ## 4. Regras transversais
 
@@ -74,7 +65,7 @@ CRUD simples (`GET /health-units` com busca por `name_normalized`, `POST/PATCH` 
 
 ## 5. Ordem de implementação sugerida
 
-1. **Migration + backfill** (link → bases `FROM_SCRATCH`, religação das respostas, unidades a partir das strings de `institutionId`).
-2. **Módulos novos** (`notification`, `share-request`, `historico`, `health-unit`) — não quebram nada existente.
+1. **Migration + backfill** (link → bases `FROM_SCRATCH`, religação das respostas).
+2. **Módulos novos** (`notification`, `share-request`, `historico`) — não quebram nada existente.
 3. **Adaptação** de `participant` e `questionnaire` (a parte com risco de regressão — cobrir com os specs de regressão existentes no padrão de `auth.regression.spec.ts`).
 4. Frontend do fluxo (alerta de existência → escolha → caixa de aprovação → notificações).

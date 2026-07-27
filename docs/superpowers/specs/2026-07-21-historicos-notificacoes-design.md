@@ -99,15 +99,9 @@ Hoje `QuestionnaireResponse` liga participante ↔ profissional ↔ questionári
 
 **Decisão: sem tenant.** O valor do fluxo de compartilhamento é a coordenação do cuidado *entre* unidades — um muro de tenant por instituição quebraria a descoberta de bases no melhor caso de uso. O cidadão é um só: registro de participante único e global na instância. A estrutura administrativa da rede entra como **dimensão de análise**, não como fronteira de dados. O isolamento clínico continua sendo por profissional, via `HistoricoBase`.
 
-**`HealthUnit` (nova, tabela de referência):**
+**`HealthUnit` — avaliada e deixada fora do escopo (decisão).** Chegou a ser desenhada como tabela de referência (nome, `cnesCode` do SUS, tipo, cidade/UF; lotação do profissional e FK para `Researcher.institutionId`), mas foi **removida do schema** para enxugar o escopo — `Researcher.institutionId` permanece string, como hoje. Fica registrada como sugestão futura: se voltar, os ganhos são exibir "profissional — especialidade — unidade" na escolha de bases e dashboards por unidade/região.
 
-- `id`, `name` (+ `name_normalized`, padrão do projeto), `cnesCode? @unique` (código CNES — identificador oficial de estabelecimentos do SUS, dá interoperabilidade de graça), `type?` (UBS/hospital/…), `city?`, `state?`, `active`.
-- `HealthProfessional.healthUnitId?` FK opcional (lotação; opcional para não travar cadastro).
-- `Researcher.institutionId` promovida de string solta a FK para `HealthUnit`.
-- Ganho no fluxo: na escolha de bases, o solicitante vê "profissional — especialidade — unidade".
-- Ganho na gestão/pesquisa: dashboards por unidade/tipo/região (fragilidade média por UBS etc.).
-
-**Multitenancy fica como opção futura**, apenas se o projeto virar plataforma multi-município com exigência de segregação administrativa: aí a `HealthUnit` evolui para baixo de uma `Organization` (secretaria municipal), com coluna discriminadora `organizationId` + filtro automático via Prisma `$extends` + RLS do Postgres como defesa em profundidade. Nada disso é pago agora.
+**Multitenancy fica como opção futura**, apenas se o projeto virar plataforma multi-município com exigência de segregação administrativa: coluna discriminadora `organizationId` + filtro automático via Prisma `$extends` + RLS do Postgres como defesa em profundidade. Nada disso é pago agora.
 
 ## Riscos e mitigação
 
