@@ -40,7 +40,7 @@ Levantamento do que deve ser **criado** e **adaptado** na API NestJS para o flux
 - **`findAll`/`findOne`** — filtro `healthProfessionalsLinks: { some: ... } }` vira `historicoBases: { some: { ownerProfessionalId, active: true } }`.
 - **`remove`/`checkDeletability`** — as relações consultadas passam a incluir `HistoricoBase` e `ShareRequest`.
 
-### 2.2 `questionnaire` ([questionnaire.service.ts](../../../src/modules/questionnaire/questionnaire.service.ts) — ~30 usos de `healthProfessionalId`)
+### 2.2 `questionnaire` ([questionnaire.service.ts](../../../src/modules/questionnaire/questionnaire.service.ts) — 35 usos de `healthProfessionalId` após o merge da sprint-1)
 
 - **`POST /questionnaires/response`** — o service resolve a `HistoricoBase` do profissional autenticado para o `participantId` (erro 403/404 se não houver base ativa dele) e grava `historicoBaseId` + `appliedByProfessionalId = user.id`. O DTO **não** recebe `historicoBaseId` do cliente — deriva do token, mantendo a fronteira de escrita.
 - **`GET /questionnaires` (findAll)** — semântica muda de "respostas que apliquei" para "respostas das **minhas bases**" (`historicoBase: { ownerProfessionalId: user.id }`) — inclui cópias recebidas, que agora são parte do meu histórico.
@@ -71,7 +71,7 @@ Levantamento do que deve ser **criado** e **adaptado** na API NestJS para o flux
 
 ## 5. Ordem de implementação sugerida
 
-1. **Migration + backfill** (link → bases `FROM_SCRATCH`, religação das respostas).
+1. **Migration + backfill** (link → bases `FROM_SCRATCH`, religação das respostas). O seed ([prisma/seed.ts](../../../prisma/seed.ts)) **já foi adaptado** neste PR ao schema novo.
 2. **Módulos novos** (`notification`, `share-request`, `historico`) — não quebram nada existente.
 3. **Adaptação** de `participant` e `questionnaire` (a parte com risco de regressão — cobrir com os specs de regressão existentes no padrão de `auth.regression.spec.ts`).
 4. Frontend do fluxo (alerta de existência → escolha → caixa de aprovação → notificações).
