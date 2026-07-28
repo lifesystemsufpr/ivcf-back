@@ -8,9 +8,15 @@ export class DashboardRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   private buildRawFilters(filters: DashboardFilterDto): Prisma.Sql {
-    if (!filters) return Prisma.empty;
+    // Agregações populacionais contam só respostas originais: cópias geradas
+    // pelo compartilhamento de base (sourceResponseId preenchido) duplicariam.
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`qr."sourceResponseId" IS NULL`,
+    ];
 
-    const conditions: Prisma.Sql[] = [];
+    if (!filters) {
+      return Prisma.sql` AND ${Prisma.join(conditions, " AND ")}`;
+    }
 
     if (filters.gender) {
       conditions.push(

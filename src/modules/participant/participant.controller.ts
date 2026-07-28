@@ -71,13 +71,11 @@ export class ParticipantController {
   checkEmail(
     @RequestUser() _user: Payload,
     @Param("email") email: string,
-  ): Promise<{ userId: string; participantId: string | undefined }> {
-    const participantService: {
-      checkEmail: (
-        value: string,
-      ) => Promise<{ userId: string; participantId: string | undefined }>;
-    } = this.participantService;
-
-    return participantService.checkEmail(email);
+  ): Promise<{
+    userId: string;
+    participantId: string | undefined;
+    hasActiveBases: boolean;
+  }> {
+    return this.participantService.checkEmail(email);
   }
 }

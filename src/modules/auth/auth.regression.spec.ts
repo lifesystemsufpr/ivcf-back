@@ -22,10 +22,11 @@ describe("Auth - Regression Tests", () => {
     fullName: "Test User",
     fullName_normalized: "test user",
     password: "mock_hashed_value", // eslint-disable-line sonarjs/no-hardcoded-passwords
+    passwordResetToken: null,
+    passwordResetExpiresAt: null,
+    passwordResetUsedAt: null,
     active: true,
-    gender: null,
     role: "PARTICIPANT" as SystemRole,
-    phone: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -40,6 +41,7 @@ describe("Auth - Regression Tests", () => {
           useValue: {
             user: {
               findUnique: jest.fn(),
+              findFirst: jest.fn(),
               update: jest.fn(),
             },
           },

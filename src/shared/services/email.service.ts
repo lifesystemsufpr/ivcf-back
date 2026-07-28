@@ -63,9 +63,7 @@ export class EmailService {
     expiresInMinutes: number,
   ): string {
     const expirationMessage =
-      expiresInMinutes === 1
-        ? "1 minuto"
-        : `${expiresInMinutes} minutos`;
+      expiresInMinutes === 1 ? "1 minuto" : `${expiresInMinutes} minutos`;
     return `
     <!DOCTYPE html>
     <html>
