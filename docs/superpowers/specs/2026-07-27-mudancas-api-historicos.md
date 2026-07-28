@@ -46,9 +46,15 @@ Levantamento do que deve ser **criado** e **adaptado** na API NestJS para o flux
 - **`GET /questionnaires` (findAll)** — semântica muda de "respostas que apliquei" para "respostas das **minhas bases**" (`historicoBase: { ownerProfessionalId: user.id }`) — inclui cópias recebidas, que agora são parte do meu histórico.
 - **`GET /questionnaires/participant/:id/*`** (`evolution`, `evolution/daily`, `summary`, `score-history`, `domain-history`, `assessment/:id`, e `getByParticipant`) — hoje esses endpoints **não têm escopo de profissional** (qualquer autenticado vê tudo do participante). Com bases isoladas isso vira vazamento: todos passam a filtrar pela base do profissional autenticado (`historicoBase: { ownerProfessionalId: user.id, participantId }`). Para o role `PARTICIPANT`, visão da própria evolução = união das bases? **Decisão de produto pendente** — sugestão: participante vê tudo sobre si (é titular do dado), filtrando `sourceResponseId IS NULL` para não ver duplicatas.
 - **Dashboards** (`dashboard`, `dashboard/export`, `dashboard/current-month`) — já são por profissional; trocam o filtro para as bases próprias. Cópias **contam** aqui (são o histórico do profissional), mas qualquer agregação populacional/pesquisa futura filtra `sourceResponseId IS NULL`.
+- **`GET /questionnaires/classified-participants`** (sprint-1 v2, entrou no dev após o desenho) — `findParticipantsByClassification` usa o helper `getLinkedParticipants` (vínculo antigo) **e SQL cru** com `qr."healthProfessionalId"` num `$queryRaw`. ⚠️ Atenção redobrada: SQL cru **não é pego pelo TypeScript** quando o schema mudar — quebra só em runtime. Trocar por `qr."appliedByProfessionalId"`/join via `historico_base` e cobrir com teste.
 - **`POST /questionnaires/responses/recompute`** — sem mudança estrutural; ao recompor scores deve processar originais e cópias igualmente.
 
-### 2.3 `health-professional`
+### 2.3 `dashboard` ([dashboard.repository.ts](../../../src/modules/dashboard/dashboard.repository.ts))
+
+- ~27 queries em SQL cru juntando por `qr."participantId"` — coluna **mantida denormalizada** no redesenho justamente para isso: **continuam funcionando sem alteração estrutural**.
+- Porém são agregações populacionais (visão pesquisa/gestão): todas precisam ganhar `AND qr."sourceResponseId" IS NULL` para não contar cópias em duplicidade após o primeiro compartilhamento aprovado.
+
+### 2.4 `health-professional`
 
 - Listagens que hoje expõem `participantsLinks` passam a derivar de `historicoBases`.
 
