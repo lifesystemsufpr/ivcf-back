@@ -14,6 +14,7 @@ import { CreateResponseDto } from "./dto/create-response.dto";
 import { FilterQuestionnaireResponseDto } from "./dto/filter-questionnaire-response.dto";
 import { FilterParticipantDto } from "./dto/filter-participant.dto";
 import { FragilityDashboardQueryDto } from "./dto/fragility-dashboard.dto";
+import { ClassifiedParticipantsQueryDto } from "./dto/classified-participants-query.dto";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { SystemRole } from "@prisma/client";
 import { RequestUser } from "../auth/decorators/request-user.decorator";
@@ -97,6 +98,15 @@ export class QuestionnaireController {
   @Get("response/:id")
   getOneResponse(@Param("id") id: string) {
     return this.service.findOneResponse(id);
+  }
+
+  @Roles([SystemRole.HEALTH_PROFESSIONAL])
+  @Get("classified-participants")
+  getClassifiedParticipants(
+    @RequestUser() user: Payload,
+    @Query() query: ClassifiedParticipantsQueryDto,
+  ) {
+    return this.service.findParticipantsByClassification(user.id, query);
   }
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])

@@ -300,6 +300,7 @@ model QuestionnaireResponse {
   @@index([participantId])
   @@index([appliedByProfessionalId])
   @@index([sourceResponseId])
+  @@index([classification])
   @@map("questionnaire_response")
 }
 

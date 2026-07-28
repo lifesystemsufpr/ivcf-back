@@ -1,0 +1,141 @@
+name: Build and deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment associated with the deployment
+        required: true
+        type: string
+      deploy-path:
+        description: Destination directory on the deployment server
+        required: true
+        type: string
+      ssh-port:
+        description: SSH server port
+        required: true
+        type: number
+    secrets:
+      DEPLOY_ENV_FILE:
+        required: true
+      DEPLOY_SSH_HOST:
+        required: true
+      DEPLOY_SSH_USERNAME:
+        required: true
+      DEPLOY_SSH_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate deployment configuration
+        shell: bash
+        env:
+          ENV_FILE_BASE64: ${{ secrets.DEPLOY_ENV_FILE }}
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_USERNAME: ${{ secrets.DEPLOY_SSH_USERNAME }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_PORT: ${{ inputs.ssh-port }}
+          DEPLOY_PATH: ${{ inputs.deploy-path }}
+        run: |
+          missing=()
+
+          for variable in ENV_FILE_BASE64 SSH_HOST SSH_USERNAME SSH_KEY SSH_PORT DEPLOY_PATH; do
+            if [ -z "${!variable}" ]; then
+              missing+=("$variable")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing repository secrets or inputs for '${{ inputs.environment }}': ${missing[*]}"
+            exit 1
+          fi
+
+          if ! grep -q -- "PRIVATE KEY-----" <<< "$SSH_KEY"; then
+            echo "::error::SSH_KEY does not contain a complete private SSH key"
+            exit 1
+          fi
+
+          if ! printf '%s' "$ENV_FILE_BASE64" | base64 --decode >/dev/null 2>&1; then
+            echo "::error::DEPLOY_ENV_FILE must contain the .env file encoded as Base64"
+            exit 1
+          fi
+
+      - name: Prepare deployment files
+        shell: bash
+        run: |
+          mkdir deploy
+          cp -r \
+            dist \
+            package.json \
+            package-lock.json \
+            prisma \
+            ecosystem.config.js \
+            prisma.config.ts \
+            deploy/
+
+      - name: Upload deployment files
+        uses: burnett01/rsync-deployments@v8
+        with:
+          switches: -avz --delete
+          path: deploy/
+          remote_path: ${{ inputs.deploy-path }}
+          remote_host: ${{ secrets.DEPLOY_SSH_HOST }}
+          remote_port: ${{ inputs.ssh-port }}
+          remote_user: ${{ secrets.DEPLOY_SSH_USERNAME }}
+          remote_key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Install, migrate and restart application
+        uses: appleboy/ssh-action@v1
+        env:
+          ENV_FILE_BASE64: ${{ secrets.DEPLOY_ENV_FILE }}
+          DEPLOY_PATH: ${{ inputs.deploy-path }}
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: ${{ secrets.DEPLOY_SSH_USERNAME }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ inputs.ssh-port }}
+          envs: ENV_FILE_BASE64,DEPLOY_PATH
+          script: |
+            set -e
+
+            cd "$DEPLOY_PATH"
+
+            printf '%s' "$ENV_FILE_BASE64" | base64 --decode > .env
+            chmod 600 .env
+
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            nvm use default
+
+            npm install
+            npx prisma generate
+            npx prisma migrate deploy
+
+            pm2 start ecosystem.config.js --env production || pm2 restart ivcf-api
+            pm2 save
