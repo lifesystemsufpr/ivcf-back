@@ -75,3 +75,24 @@ Levantamento do que deve ser **criado** e **adaptado** na API NestJS para o flux
 2. **Módulos novos** (`notification`, `share-request`, `historico`) — não quebram nada existente.
 3. **Adaptação** de `participant` e `questionnaire` (a parte com risco de regressão — cobrir com os specs de regressão existentes no padrão de `auth.regression.spec.ts`).
 4. Frontend do fluxo (alerta de existência → escolha → caixa de aprovação → notificações).
+
+## 6. Guia de execução por complexidade
+
+Legenda — **Complexidade**: 🟢 baixa · 🟡 média · 🔴 alta. **Risco** = chance de quebrar algo existente ou corromper dados se feito errado.
+
+| # | Item | Tipo | Complexidade | Risco | Por quê / dicas |
+|---|------|------|--------------|-------|-----------------|
+| 1 | Migration SQL (rename de coluna + tabelas novas) | Criar | 🔴 | 🔴 | `prisma migrate dev --create-only` e **editar o SQL na mão**: o rename `healthProfessionalId → appliedByProfessionalId` sai como DROP+ADD por padrão (perde dados) — trocar por `ALTER TABLE ... RENAME COLUMN`. Nunca rodar direto no banco de dev compartilhado. |
+| 2 | Backfill (vínculo → bases, religar respostas) | Criar | 🔴 | 🔴 | Ordem obrigatória: criar base por par do vínculo → preencher `historicoBaseId` casando (participantId, profissional) → só então `NOT NULL`. Caso-borda: resposta sem linha no vínculo → criar a base mesmo assim. Testar contra dump do dev antes. |
+| 3 | `questionnaire.service` — endpoints de leitura (`evolution`, `summary`, `score-history`, `domain-history`, `assessment`, `getByParticipant`) | Adaptar | 🔴 | 🟡 | 35 usos no service; não é find-replace: esses endpoints **ganham escopo de profissional que hoje não existe** — muda comportamento visível, o front sente. Cobrir com regression specs antes de mexer. |
+| 4 | Transação de aprovação (`approve` do share-request) | Criar | 🟡 | 🔴 | Deep-copy respostas+answers com `sourceResponseId`, tudo num `$transaction`, idempotente (re-aprovar = 409) e à prova de duplo clique. Código isolado, mas é o coração do produto — escrever os testes junto. |
+| 5 | `classified-participants` (SQL cru da sprint-1) | Adaptar | 🟡 | 🔴 | `$queryRaw` com `qr."healthProfessionalId"` — **o TypeScript não acusa**; quebra só em runtime. Trocar coluna/join e cobrir com teste de fumaça. |
+| 6 | Módulo `share-request` (create, listagens, reject, cancel) | Criar | 🟡 | 🟢 | CRUD + máquina de estados; a parte difícil (approve) é o item 4. Validar invariante "1 PENDING por (requester, source)" no service. |
+| 7 | `participant.service` (create, findAll, findOne, check-email) | Adaptar | 🟡 | 🟡 | Troca pontual de relação (`healthProfessionalsLinks` → `historicoBases`) + `hasActiveBases` no check-email. Mecânico, mas passa pelo caminho crítico de cadastro — regression specs ajudam. |
+| 8 | Guard/helper `assertBaseOwnership` | Criar | 🟡 | 🟢 | Fazer **antes** dos itens 3 e 6 para não repetir autorização em ~10 endpoints. |
+| 9 | Módulo `historico` (listar bases, criar do zero) | Criar | 🟢 | 🟢 | Duas rotas sobre índices prontos; 409 no unique do par. |
+| 10 | Módulo `notification` (listar, marcar lida) | Criar | 🟢 | 🟢 | CRUD raso; índice `[recipientUserId, readAt]` já resolve a listagem de não-lidas. |
+| 11 | `dashboard.repository` (27 queries cruas) | Adaptar | 🟢 | 🟡 | Estruturalmente já funcionam (join por `participantId` mantido); só adicionar `AND qr."sourceResponseId" IS NULL`. Chato de esquecer alguma — grep por `questionnaire_response` no arquivo confere as 27. |
+| 12 | `health-professional` (listagens) + DTOs novos | Adaptar/Criar | 🟢 | 🟢 | Derivar de `historicoBases`; DTOs são boilerplate de validação. |
+
+**Leitura rápida para dividir o trabalho:** itens 1–2 juntos (uma pessoa, foco em banco); itens 3, 5 e 7 juntos (quem conhece os endpoints atuais, com o front por perto); itens 4, 6 e 8 juntos (quem escrever os testes da transação); itens 9–12 são de pegar em paralelo, qualquer pessoa.
