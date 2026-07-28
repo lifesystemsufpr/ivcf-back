@@ -9,6 +9,7 @@ import { SystemRole, Prisma, User } from "@prisma/client";
 import { UpdateUserDto } from "./dtos/update-user.dto";
 import { hashPassword } from "src/shared/functions/hash-password";
 import { normalizeString } from "src/shared/functions/normalize-string";
+import { normalizeEmail } from "src/shared/functions/normalize-email";
 
 @Injectable()
 export class UserService {
@@ -27,7 +28,7 @@ export class UserService {
     try {
       const user = await prisma.user.create({
         data: {
-          email: userData.email,
+          email: normalizeEmail(userData.email),
           role: userData.role,
           fullName,
           fullName_normalized: normalizedFullName,
@@ -43,7 +44,9 @@ export class UserService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
-        throw new ConflictException("O e-mail fornecido já está em uso.");
+        throw new ConflictException(
+          "Este e-mail já está cadastrado no sistema.",
+        );
       }
       throw new InternalServerErrorException(
         "Não foi possível criar o usuário.",
@@ -63,7 +66,7 @@ export class UserService {
 
   findByEmail(email: string) {
     return this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizeEmail(email) },
     });
   }
 
@@ -74,6 +77,10 @@ export class UserService {
   ) {
     const prisma = tx || this.prisma;
     const dataToUpdate: Prisma.UserUpdateInput = { ...updateUserDto };
+
+    if (updateUserDto.email) {
+      dataToUpdate.email = normalizeEmail(updateUserDto.email);
+    }
 
     if (updateUserDto.password) {
       const hashedPassword = await hashPassword(updateUserDto.password);

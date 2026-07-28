@@ -1,4 +1,8 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as nodemailer from "nodemailer";
 import { Transporter } from "nodemailer";
@@ -54,6 +58,9 @@ export class EmailService {
         `Failed to send password reset email to ${email}`,
         error instanceof Error ? error.message : String(error),
       );
+      throw new InternalServerErrorException(
+        "Não foi possível enviar o e-mail de recuperação de senha. Tente novamente mais tarde.",
+      );
     }
   }
 
@@ -63,9 +70,7 @@ export class EmailService {
     expiresInMinutes: number,
   ): string {
     const expirationMessage =
-      expiresInMinutes === 1
-        ? "1 minuto"
-        : `${expiresInMinutes} minutos`;
+      expiresInMinutes === 1 ? "1 minuto" : `${expiresInMinutes} minutos`;
     return `
     <!DOCTYPE html>
     <html>
