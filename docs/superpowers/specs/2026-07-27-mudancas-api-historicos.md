@@ -1,0 +1,98 @@
+# Mudanças na API — Históricos independentes & Notificações
+
+**Data:** 2026-07-27 · **Base:** [spec de design](2026-07-21-historicos-notificacoes-design.md) + `prisma/schema.prisma` da branch `feat/der-historicos-notificacoes`
+
+Levantamento do que deve ser **criado** e **adaptado** na API NestJS para o fluxograma funcionar sobre o schema novo. Não é implementação — é o mapa da fase seguinte.
+
+## 1. Módulos novos
+
+### 1.1 `historico` (ou dentro de `participant`)
+
+| Método/Rota | Papel no fluxograma | Comportamento |
+|---|---|---|
+| `GET /participants/:id/historico-bases` | "Sistema lista os profissionais" | Lista bases **ativas** do participante: dono (nome, especialidade), `origin`, `createdAt`, contagem de respostas. Query única no índice `historico_base(participantId)`. Roles: `HEALTH_PROFESSIONAL`. |
+| `POST /participants/:id/historico-bases` | "Criar uma base do zero" | Cria `HistoricoBase(FROM_SCRATCH)` para o profissional autenticado sobre participante **já existente**. 409 se já possui base (unique do par). |
+
+### 1.2 `share-request`
+
+| Método/Rota | Papel no fluxograma | Comportamento |
+|---|---|---|
+| `POST /share-requests` | "Profissional escolhe quais quer" | Body: `participantId`, `sourceHistoricoBaseIds[]` (1..N). Para cada: valida base ativa, cria `ShareRequest(PENDING, snapshotAt=now)` + `Notification(SHARE_REQUEST_RECEIVED)` ao dono. Rejeita duplicata `PENDING` do mesmo (requester, source) — invariante de aplicação. |
+| `GET /share-requests?as=owner\|requester&status=` | Caixas de entrada/saída | `as=owner`: pedidos que devo responder (índice `[ownerProfessionalId, status]`). `as=requester`: meus pedidos. |
+| `PATCH /share-requests/:id/approve` | "Dono aprova" | Só o `ownerProfessional`. **Transação**: cria/reusa `HistoricoBase(COPIED)` do solicitante → copia `QuestionnaireResponse` (+ `Answer`) com `date <= snapshotAt`, setando `appliedByProfessionalId` original e `sourceResponseId` → seta `targetHistoricoBaseId`, `status=APPROVED`, `respondedAt` → `Notification(SHARE_REQUEST_APPROVED)` ao solicitante. |
+| `PATCH /share-requests/:id/reject` | "Dono recusa" | `status=REJECTED` + `Notification(SHARE_REQUEST_REJECTED)`. Nada copiado. |
+| `PATCH /share-requests/:id/cancel` | — | Solicitante cancela um `PENDING` próprio. |
+
+### 1.3 `notification`
+
+| Método/Rota | Comportamento |
+|---|---|
+| `GET /notifications?unread=true&page=` | Do usuário autenticado (qualquer role — FK é em `User`). Índice `[recipientUserId, readAt]`. |
+| `PATCH /notifications/:id/read` | Marca `readAt`. Só o destinatário. |
+| `PATCH /notifications/read-all` | Marca todas não-lidas. |
+
+## 2. Endpoints existentes adaptados
+
+### 2.1 `participant` ([participant.service.ts](../../../src/modules/participant/participant.service.ts))
+
+- **`POST /participant` (create)** — troca `healthProfessionalsLinks.create` pela criação de `HistoricoBase(FROM_SCRATCH)` na mesma transação. Continua sendo o caminho do ramo "não existe" do fluxograma.
+- **Ramo "já existe"** — `GET /participant/check-email/:email` já detecta existência; estender a resposta com `hasActiveBases: boolean` (e opcionalmente a contagem), para o front decidir entre alertar e seguir para `GET /participants/:id/historico-bases`. O cadastro de participante existente **não** passa por `POST /participant` (que deve continuar retornando 409 para e-mail duplicado): o front usa `POST .../historico-bases` (do zero) ou `POST /share-requests` (aproveitar).
+- **`findAll`/`findOne`** — filtro `healthProfessionalsLinks: { some: ... } }` vira `historicoBases: { some: { ownerProfessionalId, active: true } }`.
+- **`remove`/`checkDeletability`** — as relações consultadas passam a incluir `HistoricoBase` e `ShareRequest`.
+
+### 2.2 `questionnaire` ([questionnaire.service.ts](../../../src/modules/questionnaire/questionnaire.service.ts) — 35 usos de `healthProfessionalId` após o merge da sprint-1)
+
+- **`POST /questionnaires/response`** — o service resolve a `HistoricoBase` do profissional autenticado para o `participantId` (erro 403/404 se não houver base ativa dele) e grava `historicoBaseId` + `appliedByProfessionalId = user.id`. O DTO **não** recebe `historicoBaseId` do cliente — deriva do token, mantendo a fronteira de escrita.
+- **`GET /questionnaires` (findAll)** — semântica muda de "respostas que apliquei" para "respostas das **minhas bases**" (`historicoBase: { ownerProfessionalId: user.id }`) — inclui cópias recebidas, que agora são parte do meu histórico.
+- **`GET /questionnaires/participant/:id/*`** (`evolution`, `evolution/daily`, `summary`, `score-history`, `domain-history`, `assessment/:id`, e `getByParticipant`) — hoje esses endpoints **não têm escopo de profissional** (qualquer autenticado vê tudo do participante). Com bases isoladas isso vira vazamento: todos passam a filtrar pela base do profissional autenticado (`historicoBase: { ownerProfessionalId: user.id, participantId }`). Para o role `PARTICIPANT`, visão da própria evolução = união das bases? **Decisão de produto pendente** — sugestão: participante vê tudo sobre si (é titular do dado), filtrando `sourceResponseId IS NULL` para não ver duplicatas.
+- **Dashboards** (`dashboard`, `dashboard/export`, `dashboard/current-month`) — já são por profissional; trocam o filtro para as bases próprias. Cópias **contam** aqui (são o histórico do profissional), mas qualquer agregação populacional/pesquisa futura filtra `sourceResponseId IS NULL`.
+- **`GET /questionnaires/classified-participants`** (sprint-1 v2, entrou no dev após o desenho) — `findParticipantsByClassification` usa o helper `getLinkedParticipants` (vínculo antigo) **e SQL cru** com `qr."healthProfessionalId"` num `$queryRaw`. ⚠️ Atenção redobrada: SQL cru **não é pego pelo TypeScript** quando o schema mudar — quebra só em runtime. Trocar por `qr."appliedByProfessionalId"`/join via `historico_base` e cobrir com teste.
+- **`POST /questionnaires/responses/recompute`** — sem mudança estrutural; ao recompor scores deve processar originais e cópias igualmente.
+
+### 2.3 `dashboard` ([dashboard.repository.ts](../../../src/modules/dashboard/dashboard.repository.ts))
+
+- ~27 queries em SQL cru juntando por `qr."participantId"` — coluna **mantida denormalizada** no redesenho justamente para isso: **continuam funcionando sem alteração estrutural**.
+- Porém são agregações populacionais (visão pesquisa/gestão): todas precisam ganhar `AND qr."sourceResponseId" IS NULL` para não contar cópias em duplicidade após o primeiro compartilhamento aprovado.
+
+### 2.4 `health-professional`
+
+- Listagens que hoje expõem `participantsLinks` passam a derivar de `historicoBases`.
+
+## 3. DTOs novos/alterados
+
+- **Novos:** `CreateShareRequestDto`, `RespondShareRequestDto` (se reject levar justificativa), `FilterShareRequestDto`, `FilterNotificationDto`, `CreateHistoricoBaseDto` (vazio ou só validação de rota).
+- **Alterados:** resposta do `check-email` (+`hasActiveBases`), respostas de listagem de participantes (links → bases).
+
+## 4. Regras transversais
+
+- **Autorização por posse de base**: um profissional só lê/escreve respostas de bases onde é `ownerProfessional`. Centralizar num helper/guard (`assertBaseOwnership`) para não repetir em 10 endpoints.
+- **Invariantes no service** (não expressáveis no Prisma): 1 `PENDING` por (requester, source); `response.participantId === base.participantId`; aprovação idempotente (re-aprovar `APPROVED` = no-op 409).
+- **Transação de aprovação** é o ponto crítico de consistência — cópia de respostas+answers + update do pedido + notificação, tudo num `$transaction`.
+
+## 5. Ordem de implementação sugerida
+
+1. **Migration + backfill** (link → bases `FROM_SCRATCH`, religação das respostas). O seed ([prisma/seed.ts](../../../prisma/seed.ts)) **já foi adaptado** neste PR ao schema novo.
+2. **Módulos novos** (`notification`, `share-request`, `historico`) — não quebram nada existente.
+3. **Adaptação** de `participant` e `questionnaire` (a parte com risco de regressão — cobrir com os specs de regressão existentes no padrão de `auth.regression.spec.ts`).
+4. Frontend do fluxo (alerta de existência → escolha → caixa de aprovação → notificações).
+
+## 6. Guia de execução por complexidade
+
+Legenda — **Complexidade**: 🟢 baixa · 🟡 média · 🔴 alta. **Risco** = chance de quebrar algo existente ou corromper dados se feito errado.
+
+| # | Item | Tipo | Complexidade | Risco | Por quê / dicas |
+|---|------|------|--------------|-------|-----------------|
+| 1 | Migration SQL (rename de coluna + tabelas novas) | Criar | 🔴 | 🔴 | `prisma migrate dev --create-only` e **editar o SQL na mão**: o rename `healthProfessionalId → appliedByProfessionalId` sai como DROP+ADD por padrão (perde dados) — trocar por `ALTER TABLE ... RENAME COLUMN`. Nunca rodar direto no banco de dev compartilhado. |
+| 2 | Backfill (vínculo → bases, religar respostas) | Criar | 🔴 | 🔴 | Ordem obrigatória: criar base por par do vínculo → preencher `historicoBaseId` casando (participantId, profissional) → só então `NOT NULL`. Caso-borda: resposta sem linha no vínculo → criar a base mesmo assim. Testar contra dump do dev antes. |
+| 3 | `questionnaire.service` — endpoints de leitura (`evolution`, `summary`, `score-history`, `domain-history`, `assessment`, `getByParticipant`) | Adaptar | 🔴 | 🟡 | 35 usos no service; não é find-replace: esses endpoints **ganham escopo de profissional que hoje não existe** — muda comportamento visível, o front sente. Cobrir com regression specs antes de mexer. |
+| 4 | Transação de aprovação (`approve` do share-request) | Criar | 🟡 | 🔴 | Deep-copy respostas+answers com `sourceResponseId`, tudo num `$transaction`, idempotente (re-aprovar = 409) e à prova de duplo clique. Código isolado, mas é o coração do produto — escrever os testes junto. |
+| 5 | `classified-participants` (SQL cru da sprint-1) | Adaptar | 🟡 | 🔴 | `$queryRaw` com `qr."healthProfessionalId"` — **o TypeScript não acusa**; quebra só em runtime. Trocar coluna/join e cobrir com teste de fumaça. |
+| 6 | Módulo `share-request` (create, listagens, reject, cancel) | Criar | 🟡 | 🟢 | CRUD + máquina de estados; a parte difícil (approve) é o item 4. Validar invariante "1 PENDING por (requester, source)" no service. |
+| 7 | `participant.service` (create, findAll, findOne, check-email) | Adaptar | 🟡 | 🟡 | Troca pontual de relação (`healthProfessionalsLinks` → `historicoBases`) + `hasActiveBases` no check-email. Mecânico, mas passa pelo caminho crítico de cadastro — regression specs ajudam. |
+| 8 | Guard/helper `assertBaseOwnership` | Criar | 🟡 | 🟢 | Fazer **antes** dos itens 3 e 6 para não repetir autorização em ~10 endpoints. |
+| 9 | Módulo `historico` (listar bases, criar do zero) | Criar | 🟢 | 🟢 | Duas rotas sobre índices prontos; 409 no unique do par. |
+| 10 | Módulo `notification` (listar, marcar lida) | Criar | 🟢 | 🟢 | CRUD raso; índice `[recipientUserId, readAt]` já resolve a listagem de não-lidas. |
+| 11 | `dashboard.repository` (27 queries cruas) | Adaptar | 🟢 | 🟡 | Estruturalmente já funcionam (join por `participantId` mantido); só adicionar `AND qr."sourceResponseId" IS NULL`. Chato de esquecer alguma — grep por `questionnaire_response` no arquivo confere as 27. |
+| 12 | `health-professional` (listagens) + DTOs novos | Adaptar/Criar | 🟢 | 🟢 | Derivar de `historicoBases`; DTOs são boilerplate de validação. |
+
+**Leitura rápida para dividir o trabalho:** itens 1–2 juntos (uma pessoa, foco em banco); itens 3, 5 e 7 juntos (quem conhece os endpoints atuais, com o front por perto); itens 4, 6 e 8 juntos (quem escrever os testes da transação); itens 9–12 são de pegar em paralelo, qualquer pessoa.

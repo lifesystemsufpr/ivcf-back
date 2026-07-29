@@ -23,8 +23,11 @@ async function main() {
 
   console.log("🗑️ Limpando dados antigos...");
 
+  await prisma.notification.deleteMany({});
+  await prisma.shareRequest.deleteMany({});
   await prisma.answer.deleteMany({});
   await prisma.questionnaireResponse.deleteMany({});
+  await prisma.historicoBase.deleteMany({});
   await prisma.questionOption.deleteMany({});
   await prisma.question.deleteMany({});
   await prisma.questionSubGroup.deleteMany({});
@@ -560,19 +563,20 @@ async function main() {
             state: "PR",
             neighborhood: "Batel",
             gender: sex === "male" ? Gender.MALE : Gender.FEMALE,
-            healthProfessionalsLinks: {
+            historicoBases: {
               create: {
-                healthProfessionalId: randomHPId,
+                ownerProfessionalId: randomHPId,
               },
             },
           },
         },
       },
-      include: { participant: true },
+      include: { participant: { include: { historicoBases: true } } },
     });
 
     if (!participantUser.participant) continue;
     const participantId = participantUser.participant.id;
+    const historicoBase = participantUser.participant.historicoBases[0];
 
     if (Math.random() > 0.2 && ivcfFull) {
       const responseDate = faker.date.recent({ days: 90 });
@@ -625,8 +629,9 @@ async function main() {
 
       await prisma.questionnaireResponse.create({
         data: {
+          historicoBaseId: historicoBase.id,
           participantId: participantId,
-          healthProfessionalId: randomHPId,
+          appliedByProfessionalId: randomHPId,
           questionnaireId: ivcfFull.id,
           date: responseDate,
           totalScore: totalScore,

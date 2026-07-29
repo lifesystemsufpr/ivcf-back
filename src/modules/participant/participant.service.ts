@@ -74,9 +74,9 @@ export class ParticipantService extends BaseService<
           ...participantData,
           birthday,
           id: user.id,
-          healthProfessionalsLinks: {
+          historicoBases: {
             create: {
-              healthProfessionalId,
+              ownerProfessionalId: healthProfessionalId,
             },
           },
         },
@@ -194,8 +194,8 @@ export class ParticipantService extends BaseService<
 
     const andFilters: Prisma.ParticipantWhereInput[] = [
       {
-        healthProfessionalsLinks: {
-          some: { healthProfessionalId },
+        historicoBases: {
+          some: { ownerProfessionalId: healthProfessionalId, active: true },
         },
       },
       { user: { active: true } },
@@ -412,8 +412,8 @@ export class ParticipantService extends BaseService<
     };
 
     if (requestUser?.role === SystemRole.HEALTH_PROFESSIONAL) {
-      where.healthProfessionalsLinks = {
-        some: { healthProfessionalId: requestUser.id },
+      where.historicoBases = {
+        some: { ownerProfessionalId: requestUser.id, active: true },
       };
     }
 
@@ -564,15 +564,22 @@ export class ParticipantService extends BaseService<
     return await this.prisma.checkDeletionSafety("Participant", id);
   }
 
-  async checkEmail(
-    email: string,
-  ): Promise<{ userId: string; participantId: string | undefined }> {
+  async checkEmail(email: string): Promise<{
+    userId: string;
+    participantId: string | undefined;
+    hasActiveBases: boolean;
+  }> {
     const user = await this.prisma.user.findUnique({
       where: { email },
       select: {
         id: true,
         participant: {
-          select: { id: true },
+          select: {
+            id: true,
+            _count: {
+              select: { historicoBases: { where: { active: true } } },
+            },
+          },
         },
       },
     });
@@ -581,6 +588,10 @@ export class ParticipantService extends BaseService<
       throw new NotFoundException({ message: "Email not found" });
     }
 
-    return { userId: user.id, participantId: user.participant?.id };
+    return {
+      userId: user.id,
+      participantId: user.participant?.id,
+      hasActiveBases: (user.participant?._count.historicoBases ?? 0) > 0,
+    };
   }
 }

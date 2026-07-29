@@ -139,7 +139,9 @@ export class QuestionnaireController {
 
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Get("dashboard/current-month")
-  getCurrentMonthStats(@RequestUser() user: Payload): Promise<CurrentMonthStatsResponse> {
+  getCurrentMonthStats(
+    @RequestUser() user: Payload,
+  ): Promise<CurrentMonthStatsResponse> {
     return this.service.getCurrentMonthStats(user.id);
   }
 

@@ -33,12 +33,14 @@ describe("QuestionnaireService - IVCF scoring", () => {
 
   // Access private method via bracket notation.
   const compute = (answers: Answer[]) =>
-    (service as unknown as {
-      computeDomainsFromAnswers: (a: Answer[]) => {
-        domains: Record<string, number>;
-        totalScore: number;
-      };
-    }).computeDomainsFromAnswers(answers);
+    (
+      service as unknown as {
+        computeDomainsFromAnswers: (a: Answer[]) => {
+          domains: Record<string, number>;
+          totalScore: number;
+        };
+      }
+    ).computeDomainsFromAnswers(answers);
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -148,9 +150,11 @@ describe("QuestionnaireService - IVCF scoring", () => {
 
   describe("Risk classification", () => {
     const classify = (score: number) =>
-      (service as unknown as {
-        classifyResponseRisk: (s: number) => string;
-      }).classifyResponseRisk(score);
+      (
+        service as unknown as {
+          classifyResponseRisk: (s: number) => string;
+        }
+      ).classifyResponseRisk(score);
 
     it("<7 is Robusto", () => {
       expect(classify(0)).toBe("Robusto");

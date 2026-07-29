@@ -140,7 +140,7 @@ export interface FragilityDashboardResponse {
       group: string;
       Robusto: number;
       "Pré-frágil": number;
-      "Frágil": number;
+      Frágil: number;
     }>;
     scatter: Array<{
       id: string;

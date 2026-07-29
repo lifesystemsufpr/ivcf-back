@@ -10,14 +10,17 @@ import {
 } from "@nestjs/common";
 import { HealthProfessionalService } from "./health-professional.service";
 import { CreateHealthProfessionalDto } from "./dto/create-health-professional.dto";
-import {LinkParticipantDto, UpdateHealthProfessionalDto} from "./dto/update-health-professional.dto";
+import {
+  LinkParticipantDto,
+  UpdateHealthProfessionalDto,
+} from "./dto/update-health-professional.dto";
 import { ApiBearerAuth, ApiNoContentResponse } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { SystemRole } from "@prisma/client";
 import { QueryDto } from "src/shared/dto/query.dto";
 import { Public } from "../auth/decorators/public.decorator";
-import {RequestUser} from "../auth/decorators/request-user.decorator";
-import {Payload} from "../auth/interfaces/auth.interface";
+import { RequestUser } from "../auth/decorators/request-user.decorator";
+import { Payload } from "../auth/interfaces/auth.interface";
 
 @Controller("health-professional")
 @ApiBearerAuth()

@@ -170,9 +170,7 @@ export class AuthService {
     }
 
     const passwordRecoveryConfig =
-      this.configService.getOrThrow<PasswordRecoveryConfig>(
-        "passwordRecovery",
-      );
+      this.configService.getOrThrow<PasswordRecoveryConfig>("passwordRecovery");
 
     const resetToken = this.generateResetToken();
     const resetTokenHash = this.hashResetToken(resetToken);
@@ -209,7 +207,10 @@ export class AuthService {
       throw new BadRequestException("Token inválido ou expirado.");
     }
 
-    if (!user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
+    if (
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt < new Date()
+    ) {
       throw new BadRequestException("Token inválido ou expirado.");
     }
 
