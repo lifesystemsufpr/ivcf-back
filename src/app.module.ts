@@ -34,6 +34,7 @@ import { HistoricoBaseModule } from "./modules/historico-base/historico-base.mod
     ParticipantModule,
     QuestionnairesModule,
     DashboardModule,
+    ShareRequestModule,
     HistoricoBaseModule,
   ],
   providers: [
