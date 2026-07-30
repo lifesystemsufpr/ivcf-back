@@ -14,6 +14,8 @@ import { PrismaModule } from "./shared/prisma/prisma.module";
 import { APP_FILTER } from "@nestjs/core";
 import { PrismaClientExceptionFilter } from "./shared/prisma/filters/prisma-client-exception.filter";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
+import { ShareRequestModule } from "./modules/share-request/share-request.module";
+import { HistoricoBaseModule } from "./modules/historico-base/historico-base.module";
 
 @Module({
   imports: [
@@ -32,6 +34,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     ParticipantModule,
     QuestionnairesModule,
     DashboardModule,
+    HistoricoBaseModule,
   ],
   providers: [
     ...provideGlobalAppGuards(),
