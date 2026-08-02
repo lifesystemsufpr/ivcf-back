@@ -556,12 +556,19 @@ export class QuestionnaireService {
   async findAllByParticipant(
     participantId: string,
     filters?: FilterParticipantDto,
+    ownerProfessionalId?: string,
   ) {
     const { classification, startDate, endDate } = filters || {};
 
     const conditions: Prisma.QuestionnaireResponseWhereInput[] = [
       { participantId },
     ];
+
+    // Escopa as avaliações à base do profissional dono: cada profissional só
+    // enxerga as respostas da própria base, nunca as de outra base do participante.
+    if (ownerProfessionalId) {
+      conditions.push({ historicoBase: { ownerProfessionalId } });
+    }
 
     if (classification && classification !== "Todos") {
       const matchingLabels =
@@ -665,16 +672,27 @@ export class QuestionnaireService {
     comorbidities: 0,
   };
 
-  private async getIvcfResponsesQuery(participantId: string) {
+  private async getIvcfResponsesQuery(
+    participantId: string,
+    ownerProfessionalId?: string,
+  ) {
     const responseIds = await this.prisma.$queryRaw<{ id: string }[]>`
         SELECT DISTINCT
         ON (DATE (qr."date"))
             qr."id"
         FROM "questionnaire_response" AS qr
             INNER JOIN "questionnaire" AS q
-        ON q."id" = qr."questionnaireId"
+        ON q."id" = qr."questionnaireId" ${
+          ownerProfessionalId
+            ? Prisma.sql`INNER JOIN "historico_base" AS hb ON hb."id" = qr."historicoBaseId"`
+            : Prisma.empty
+        }
         WHERE qr."participantId" = ${participantId}
-          AND q."slug" = 'ivcf-20'
+          AND q."slug" = 'ivcf-20' ${
+            ownerProfessionalId
+              ? Prisma.sql`AND hb."ownerProfessionalId" = ${ownerProfessionalId}`
+              : Prisma.empty
+          }
         ORDER BY DATE (qr."date") ASC, qr."createdAt" DESC
     `;
 
@@ -709,11 +727,17 @@ export class QuestionnaireService {
     });
   }
 
-  private async getAllIvcfResponsesQuery(participantId: string) {
+  private async getAllIvcfResponsesQuery(
+    participantId: string,
+    ownerProfessionalId?: string,
+  ) {
     return this.prisma.questionnaireResponse.findMany({
       where: {
         participantId,
         questionnaire: { slug: "ivcf-20" },
+        ...(ownerProfessionalId
+          ? { historicoBase: { ownerProfessionalId } }
+          : {}),
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
       include: {
@@ -1886,10 +1910,11 @@ export class QuestionnaireService {
 
   async getParticipantEvolution(
     participantId: string,
+    ownerProfessionalId?: string,
   ): Promise<ParticipantEvolutionResponse> {
     const [participant, responses] = await Promise.all([
       this.getParticipantWithName(participantId),
-      this.getIvcfResponsesQuery(participantId),
+      this.getIvcfResponsesQuery(participantId, ownerProfessionalId),
     ]);
 
     const assessments = responses.map((r) => this.computeAssessment(r));
@@ -1903,10 +1928,11 @@ export class QuestionnaireService {
 
   async getParticipantEvolutionDaily(
     participantId: string,
+    ownerProfessionalId?: string,
   ): Promise<ParticipantEvolutionDailyData> {
     const [participant, responses] = await Promise.all([
       this.getParticipantWithName(participantId),
-      this.getAllIvcfResponsesQuery(participantId),
+      this.getAllIvcfResponsesQuery(participantId, ownerProfessionalId),
     ]);
 
     const groupedAssessments = new Map<string, IVCF_Assessment[]>();
@@ -1949,10 +1975,11 @@ export class QuestionnaireService {
 
   async getParticipantSummary(
     participantId: string,
+    ownerProfessionalId?: string,
   ): Promise<ParticipantSummaryResponse> {
     const [participant, responses] = await Promise.all([
       this.getParticipantWithName(participantId),
-      this.getIvcfResponsesQuery(participantId),
+      this.getIvcfResponsesQuery(participantId, ownerProfessionalId),
     ]);
 
     const assessments = responses.map((r) => this.computeAssessment(r));
@@ -1975,10 +2002,13 @@ export class QuestionnaireService {
     };
   }
 
-  async getScoreHistory(participantId: string): Promise<ScoreHistoryResponse> {
+  async getScoreHistory(
+    participantId: string,
+    ownerProfessionalId?: string,
+  ): Promise<ScoreHistoryResponse> {
     const [participant, responses] = await Promise.all([
       this.getParticipantWithName(participantId),
-      this.getIvcfResponsesQuery(participantId),
+      this.getIvcfResponsesQuery(participantId, ownerProfessionalId),
     ]);
 
     const scores = responses.map((r) => {
@@ -2000,10 +2030,11 @@ export class QuestionnaireService {
 
   async getDomainHistory(
     participantId: string,
+    ownerProfessionalId?: string,
   ): Promise<DomainHistoryResponse> {
     const [participant, responses] = await Promise.all([
       this.getParticipantWithName(participantId),
-      this.getIvcfResponsesQuery(participantId),
+      this.getIvcfResponsesQuery(participantId, ownerProfessionalId),
     ]);
 
     const history = responses.map((r) => {
@@ -2025,12 +2056,16 @@ export class QuestionnaireService {
   async getAssessmentDetail(
     participantId: string,
     assessmentId: string,
+    ownerProfessionalId?: string,
   ): Promise<AssessmentDetailResponse> {
     const response = await this.prisma.questionnaireResponse.findUniqueOrThrow({
       where: {
         id: assessmentId,
         participantId,
         questionnaire: { slug: "ivcf-20" },
+        ...(ownerProfessionalId
+          ? { historicoBase: { ownerProfessionalId } }
+          : {}),
       },
       include: {
         answers: {

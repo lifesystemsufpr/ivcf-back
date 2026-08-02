@@ -52,47 +52,72 @@ export class QuestionnaireController {
     });
   }
 
+  // A visão de detalhe do participante é escopada à base do profissional dono.
+  // Para MANAGER (e demais papéis) mantém-se a visão global (sem escopo por base).
+  private ownerScope(user: Payload): string | undefined {
+    return user.role === SystemRole.HEALTH_PROFESSIONAL ? user.id : undefined;
+  }
+
   @Get("participant/:participantId")
   getByParticipant(
+    @RequestUser() user: Payload,
     @Param("participantId") id: string,
     @Query() query: FilterParticipantDto,
   ) {
-    return this.service.findAllByParticipant(id, query);
+    return this.service.findAllByParticipant(id, query, this.ownerScope(user));
   }
 
   @Get("participant/:participantId/evolution")
-  getParticipantEvolution(@Param("participantId") id: string) {
-    return this.service.getParticipantEvolution(id);
+  getParticipantEvolution(
+    @RequestUser() user: Payload,
+    @Param("participantId") id: string,
+  ) {
+    return this.service.getParticipantEvolution(id, this.ownerScope(user));
   }
 
   @Get("participant/:participantId/evolution/daily")
   getParticipantEvolutionDaily(
+    @RequestUser() user: Payload,
     @Param("participantId") id: string,
   ): Promise<ParticipantEvolutionDailyData> {
-    return this.service.getParticipantEvolutionDaily(id);
+    return this.service.getParticipantEvolutionDaily(id, this.ownerScope(user));
   }
 
   @Get("participant/:participantId/summary")
-  getParticipantSummary(@Param("participantId") id: string) {
-    return this.service.getParticipantSummary(id);
+  getParticipantSummary(
+    @RequestUser() user: Payload,
+    @Param("participantId") id: string,
+  ) {
+    return this.service.getParticipantSummary(id, this.ownerScope(user));
   }
 
   @Get("participant/:participantId/score-history")
-  getScoreHistory(@Param("participantId") id: string) {
-    return this.service.getScoreHistory(id);
+  getScoreHistory(
+    @RequestUser() user: Payload,
+    @Param("participantId") id: string,
+  ) {
+    return this.service.getScoreHistory(id, this.ownerScope(user));
   }
 
   @Get("participant/:participantId/domain-history")
-  getDomainHistory(@Param("participantId") id: string) {
-    return this.service.getDomainHistory(id);
+  getDomainHistory(
+    @RequestUser() user: Payload,
+    @Param("participantId") id: string,
+  ) {
+    return this.service.getDomainHistory(id, this.ownerScope(user));
   }
 
   @Get("participant/:participantId/assessment/:assessmentId")
   getAssessmentDetail(
+    @RequestUser() user: Payload,
     @Param("participantId") participantId: string,
     @Param("assessmentId") assessmentId: string,
   ) {
-    return this.service.getAssessmentDetail(participantId, assessmentId);
+    return this.service.getAssessmentDetail(
+      participantId,
+      assessmentId,
+      this.ownerScope(user),
+    );
   }
 
   @Get("response/:id")

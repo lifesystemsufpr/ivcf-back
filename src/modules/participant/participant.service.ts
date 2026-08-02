@@ -510,21 +510,42 @@ export class ParticipantService extends BaseService<
     await this.findOne(id, { requestUser });
     const relationInfo = await this.checkDeletability(id);
 
+    const isHealthProfessional =
+      requestUser.role === SystemRole.HEALTH_PROFESSIONAL;
+
     try {
       const deactivatedParticipant = await this.prisma.$transaction(
         async (tx) => {
-          const participant = await tx.participant.update({
+          if (isHealthProfessional) {
+            // O participante é compartilhado entre profissionais (via HistoricoBase).
+            // A exclusão feita por um profissional deve desativar apenas o vínculo
+            // (base) dele, mantendo o participante visível para os demais.
+            await tx.historicoBase.update({
+              where: {
+                participantId_ownerProfessionalId: {
+                  participantId: id,
+                  ownerProfessionalId: requestUser.id,
+                },
+              },
+              data: { active: false },
+            });
+          } else {
+            // Exclusão administrativa (MANAGER): desativa o participante globalmente.
+            await tx.participant.update({
+              where: { id },
+              data: { active: false },
+            });
+
+            await tx.user.update({
+              where: { id },
+              data: { active: false },
+            });
+          }
+
+          return tx.participant.findUniqueOrThrow({
             where: { id },
-            data: { active: false },
             include: { user: true },
           });
-
-          await tx.user.update({
-            where: { id },
-            data: { active: false },
-          });
-
-          return participant;
         },
       );
 
@@ -564,10 +585,15 @@ export class ParticipantService extends BaseService<
     return await this.prisma.checkDeletionSafety("Participant", id);
   }
 
-  async checkEmail(email: string): Promise<{
+  async checkEmail(
+    email: string,
+    healthProfessionalId: string,
+  ): Promise<{
     userId: string;
     participantId: string | undefined;
     hasActiveBases: boolean;
+    hasBaseWithProfessional: boolean;
+    baseActive: boolean;
   }> {
     const user = await this.prisma.user.findUnique({
       where: { email },
@@ -576,6 +602,12 @@ export class ParticipantService extends BaseService<
         participant: {
           select: {
             id: true,
+            // Vínculo (ativo ou inativo) entre ESTE profissional e o participante.
+            // O unique (participantId, ownerProfessionalId) garante 0 ou 1 registro.
+            historicoBases: {
+              where: { ownerProfessionalId: healthProfessionalId },
+              select: { active: true },
+            },
             _count: {
               select: { historicoBases: { where: { active: true } } },
             },
@@ -588,10 +620,16 @@ export class ParticipantService extends BaseService<
       throw new NotFoundException({ message: "Email not found" });
     }
 
+    const professionalBase = user.participant?.historicoBases[0];
+
     return {
       userId: user.id,
       participantId: user.participant?.id,
       hasActiveBases: (user.participant?._count.historicoBases ?? 0) > 0,
+      // Profissional-específico: o front usa isto para decidir entre bloquear
+      // (base ativa), reativar (base inativa) ou criar vínculo novo (sem base).
+      hasBaseWithProfessional: Boolean(professionalBase),
+      baseActive: professionalBase?.active ?? false,
     };
   }
 }
