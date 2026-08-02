@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 import { PrismaService } from "../../shared/prisma/prisma.service";
@@ -33,6 +34,7 @@ describe("Auth - Regression Tests", () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [AuthController],
       providers: [
         AuthService,

@@ -19,6 +19,10 @@ import basicAuth = require("express-basic-auth");
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Atrás do nginx (um hop). Faz o Express resolver req.ip a partir do
+  // X-Forwarded-For, para o rate limit do auth chavear pelo IP real do cliente
+  // (sem isto, todos os clientes contariam como o IP do proxy e travariam juntos).
+  app.getHttpAdapter().getInstance().set("trust proxy", 1);
   const globalPrefix = "backend";
   app.setGlobalPrefix(globalPrefix);
   const logger = new Logger("AppInitializer");
