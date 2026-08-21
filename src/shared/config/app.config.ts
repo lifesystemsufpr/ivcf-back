@@ -9,7 +9,10 @@ import {
 const DEFAULT_EXP_TIME = 86400;
 const SEVEN_DAYS_IN_SECONDS = 604800; // 604800
 
-function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
+function parseBoolean(
+  value: string | undefined,
+  defaultValue: boolean,
+): boolean {
   if (value === undefined) {
     return defaultValue;
   }

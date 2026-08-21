@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 import { PrismaService } from "../../shared/prisma/prisma.service";
@@ -22,16 +23,18 @@ describe("Auth - Regression Tests", () => {
     fullName: "Test User",
     fullName_normalized: "test user",
     password: "mock_hashed_value", // eslint-disable-line sonarjs/no-hardcoded-passwords
+    passwordResetToken: null,
+    passwordResetExpiresAt: null,
+    passwordResetUsedAt: null,
     active: true,
-    gender: null,
     role: "PARTICIPANT" as SystemRole,
-    phone: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [AuthController],
       providers: [
         AuthService,
@@ -40,6 +43,7 @@ describe("Auth - Regression Tests", () => {
           useValue: {
             user: {
               findUnique: jest.fn(),
+              findFirst: jest.fn(),
               update: jest.fn(),
             },
           },

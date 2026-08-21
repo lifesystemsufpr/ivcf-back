@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 import { PrismaService } from "../../shared/prisma/prisma.service";
@@ -23,16 +24,18 @@ describe("Auth - Password Recovery", () => {
     fullName: "Test User",
     fullName_normalized: "test user",
     password: "mock_hashed_value", // eslint-disable-line sonarjs/no-hardcoded-passwords
+    passwordResetToken: null,
+    passwordResetExpiresAt: null,
+    passwordResetUsedAt: null,
     active: true,
-    gender: null,
     role: "PARTICIPANT" as SystemRole,
-    phone: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }])],
       controllers: [AuthController],
       providers: [
         AuthService,
@@ -41,6 +44,7 @@ describe("Auth - Password Recovery", () => {
           useValue: {
             user: {
               findUnique: jest.fn(),
+              findFirst: jest.fn(),
               update: jest.fn(),
             },
           },
@@ -58,6 +62,11 @@ describe("Auth - Password Recovery", () => {
           useValue: {
             getOrThrow: jest.fn((key: string) => {
               if (key === "security") return { jwtSecret: "secret" };
+              if (key === "passwordRecovery")
+                return {
+                  tokenExpiryMinutes: 30,
+                  frontendBaseUrl: "http://localhost:3000",
+                };
               if (key === "email")
                 return { fromAddress: "a@a.com", fromName: "T" };
               return null;
@@ -102,11 +111,11 @@ describe("Auth - Password Recovery", () => {
 
   describe("resetPassword", () => {
     it("should update password when token is valid", async () => {
-      jest.spyOn(jwtService, "decode").mockReturnValue({ sub: mockUser.id });
-      jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
-      jest
-        .spyOn(jwtService, "verifyAsync")
-        .mockResolvedValue({ sub: mockUser.id });
+      jest.spyOn(prismaService.user, "findFirst").mockResolvedValue({
+        ...mockUser,
+        passwordResetToken: "stored-hash", // eslint-disable-line sonarjs/no-hardcoded-passwords
+        passwordResetExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      });
 
       await authService.resetPassword("token", "NewPass123!");
 

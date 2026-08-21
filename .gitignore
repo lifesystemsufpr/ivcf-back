@@ -405,3 +405,6 @@ dist
 /generated/prisma
 DEPLOYMENT-GUIDE.md
 scripts/manual-deploy.sh
+
+# Claude Code
+.claude/

@@ -19,8 +19,10 @@ import { Response, Request } from "express";
 import { ConfigService } from "@nestjs/config";
 import { ApiBody, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { ForgotPasswordDto, ResetPasswordDto } from "./dto/forgot-password.dto";
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 
 @Controller("auth")
+@UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -29,6 +31,7 @@ export class AuthController {
 
   @Post("login")
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(LocalAuthGuard)
   @ApiBody({ type: LoginDto })
   async login(
@@ -69,6 +72,7 @@ export class AuthController {
 
   @Post("refresh")
   @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -107,6 +111,7 @@ export class AuthController {
 
   @Post("forgot-password")
   @Public()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Iniciar recuperação de senha",
@@ -134,6 +139,7 @@ export class AuthController {
 
   @Post("reset-password")
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Redefinir senha",

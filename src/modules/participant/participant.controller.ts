@@ -69,15 +69,15 @@ export class ParticipantController {
   @Roles([SystemRole.HEALTH_PROFESSIONAL])
   @Get("check-email/:email")
   checkEmail(
-    @RequestUser() _user: Payload,
+    @RequestUser() user: Payload,
     @Param("email") email: string,
-  ): Promise<{ userId: string; participantId: string | undefined }> {
-    const participantService: {
-      checkEmail: (
-        value: string,
-      ) => Promise<{ userId: string; participantId: string | undefined }>;
-    } = this.participantService;
-
-    return participantService.checkEmail(email);
+  ): Promise<{
+    userId: string;
+    participantId: string | undefined;
+    hasActiveBases: boolean;
+    hasBaseWithProfessional: boolean;
+    baseActive: boolean;
+  }> {
+    return this.participantService.checkEmail(email, user.id);
   }
 }

@@ -246,24 +246,25 @@ export class HealthProfessionalService extends BaseService<
   ) {
     const { participantId } = linkParticipantDto;
 
-    const linkAlreadyExists =
-      await this.prisma.healthProfessionalParticipant.findFirst({
-        where: {
+    const baseAlreadyExists = await this.prisma.historicoBase.findUnique({
+      where: {
+        participantId_ownerProfessionalId: {
           participantId,
-          healthProfessionalId,
+          ownerProfessionalId: healthProfessionalId,
         },
-      });
+      },
+    });
 
-    if (linkAlreadyExists) {
+    if (baseAlreadyExists) {
       throw new BadRequestException(
         "O participante já está vinculado a este profissional de saúde.",
       );
     }
 
-    return this.prisma.healthProfessionalParticipant.create({
+    return this.prisma.historicoBase.create({
       data: {
         participantId,
-        healthProfessionalId,
+        ownerProfessionalId: healthProfessionalId,
       },
     });
   }
