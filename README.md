@@ -86,6 +86,18 @@ pnpm prisma:init
 - Verifique se a variável de ambiente `SWAGGER_ENABLED` está definida para true
 - Verifique a rota da documentação via `SWAGGER_PATH` padrão: `api-docs` (URL final: `/backend/api-docs`)
 
+## Deploy com Docker
+
+O workflow `.github/workflows/deploy.yaml` publica a imagem no GHCR e implanta na VPS. `main` usa o environment `prod`; `dev` usa `dev`.
+
+Configure os seguintes secrets em cada GitHub Environment:
+
+- `ENV_PROD_FILE`: conteúdo completo do `.env.prod`, baseado em `.env.prod.example`;
+- `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_SSH_PORT` e `VPS_APP_PATH`;
+- `GHCR_USER` e `GHCR_PAT`, com permissão para baixar a imagem privada.
+
+Na VPS, o serviço publica somente `127.0.0.1:3001`. O gateway do `lifesystems-infra` o expõe em `/ivcf-api`; o Swagger fica em `/ivcf-api/api-docs`.
+
 ## Arquitetura
 
 - [Swagger](https://docs.nestjs.com/openapi/introduction)

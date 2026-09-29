@@ -1,0 +1,15 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE:?Informe BACKEND_IMAGE}:${IMAGE_TAG:?Informe IMAGE_TAG}
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      NEST_PORT: 3000
+    ports:
+      - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-3001}:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    stop_grace_period: 30s

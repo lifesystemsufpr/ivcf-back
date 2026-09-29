@@ -7,6 +7,7 @@ export function setupSwagger(app: INestApplication, config: SwaggerConfig) {
     .setTitle(config.title)
     .setDescription(config.description)
     .setVersion(config.version)
+    .addServer(process.env.SWAGGER_SERVER_URL?.trim() || "/backend")
     .addBearerAuth(
       {
         type: "http",
@@ -19,7 +20,9 @@ export function setupSwagger(app: INestApplication, config: SwaggerConfig) {
     )
     .addSecurityRequirements("bearer");
 
-  const document = SwaggerModule.createDocument(app, builder.build());
+  const document = SwaggerModule.createDocument(app, builder.build(), {
+    ignoreGlobalPrefix: true,
+  });
 
   SwaggerModule.setup(config.path, app, document, {
     swaggerOptions: {

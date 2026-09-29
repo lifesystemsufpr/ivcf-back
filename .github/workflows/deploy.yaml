@@ -1,0 +1,108 @@
+name: Build, Push & Deploy
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente de destino
+        required: true
+        type: choice
+        default: dev
+        options: [dev, prod]
+
+concurrency:
+  group: deploy-${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nome da imagem
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build e push do backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:sha-${{ github.sha }}
+            ${{ steps.image.outputs.name }}:${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar ambiente da API
+        env:
+          ENV_PROD_FILE: ${{ secrets.ENV_PROD_FILE }}
+        run: |
+          test -n "$ENV_PROD_FILE"
+          umask 077
+          printf '%s\n' "$ENV_PROD_FILE" > .env.prod
+      - name: Copiar compose e ambiente para a VM
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          source: docker-compose.prod.yml,.env.prod
+          target: ${{ secrets.VPS_APP_PATH }}
+      - name: Baixar imagem, migrar e reiniciar backend
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_PATH: ${{ secrets.VPS_APP_PATH }}
+          COMPOSE_PROJECT: ivcf-back-${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+          BACKEND_IMAGE: ${{ needs.build-and-push.outputs.image }}
+          IMAGE_TAG: sha-${{ github.sha }}
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          envs: COMPOSE_PROJECT,APP_PATH,BACKEND_IMAGE,IMAGE_TAG,GHCR_USER,GHCR_PAT
+          command_timeout: 15m
+          script: |
+            set -eu
+            cd "$APP_PATH"
+            chmod 600 .env.prod
+            export BACKEND_IMAGE IMAGE_TAG
+            printf '%s' "$GHCR_PAT" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+            docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file .env.prod pull backend
+            docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps backend ./node_modules/.bin/prisma migrate deploy
+            docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file .env.prod up -d --wait --wait-timeout 120 backend
+            printf 'BACKEND_IMAGE=%s\nIMAGE_TAG=%s\n' "$BACKEND_IMAGE" "$IMAGE_TAG" > .image.env
+            echo 'Backend atualizado e saudavel.'
+      - name: Limpar arquivo temporario do runner
+        if: always()
+        run: rm -f .env.prod

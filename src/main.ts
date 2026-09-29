@@ -117,7 +117,7 @@ async function bootstrap() {
   }
 
   const port = Number(nestConfig.port) || 3333;
-  await app.listen(port, "127.0.0.1");
+  await app.listen(port, "0.0.0.0");
 
   logger.log(
     `[${nestConfig.environment}] Application is running on: ${await app.getUrl()}`,
