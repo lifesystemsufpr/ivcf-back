@@ -2,7 +2,7 @@ name: Build, Push & Deploy
 
 on:
   push:
-    branches: [main, dev]
+    branches: [chore/prod, dev]
   workflow_dispatch:
     inputs:
       environment:
@@ -13,7 +13,8 @@ on:
         options: [dev, prod]
 
 concurrency:
-  group: deploy-${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+  # Alterar chore/prod para main quando o deploy para produção for feito a partir da branch main
+  group: deploy-${{ inputs.environment || (github.ref == 'refs/heads/chore/prod' && 'prod' || 'dev') }}
   cancel-in-progress: false
 
 permissions:
@@ -25,7 +26,8 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+    # Alterar chore/prod para main quando o deploy para produção for feito a partir da branch main
+    environment: ${{ inputs.environment || (github.ref == 'refs/heads/chore/prod' && 'prod' || 'dev') }}
     permissions:
       contents: read
       packages: write
@@ -48,16 +50,18 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          # Alterar chore/prod para main quando o deploy para produção for feito a partir da branch main
           tags: |
             ${{ steps.image.outputs.name }}:sha-${{ github.sha }}
-            ${{ steps.image.outputs.name }}:${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+            ${{ steps.image.outputs.name }}:${{ inputs.environment || (github.ref == 'refs/heads/chore/prod' && 'prod' || 'dev') }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+    # Alterar chore/prod para main quando o deploy para produção for feito a partir da branch main
+    environment: ${{ inputs.environment || (github.ref == 'refs/heads/chore/prod' && 'prod' || 'dev') }}
     steps:
       - uses: actions/checkout@v4
       - name: Preparar ambiente da API
@@ -80,7 +84,8 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           APP_PATH: ${{ secrets.VPS_APP_PATH }}
-          COMPOSE_PROJECT: ivcf-back-${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+          # Alterar chore/prod para main quando o deploy para produção for feito a partir da branch main
+          COMPOSE_PROJECT: ivcf-back-${{ inputs.environment || (github.ref == 'refs/heads/chore/prod' && 'prod' || 'dev') }}
           BACKEND_IMAGE: ${{ needs.build-and-push.outputs.image }}
           IMAGE_TAG: sha-${{ github.sha }}
           GHCR_USER: ${{ secrets.GHCR_USER }}
